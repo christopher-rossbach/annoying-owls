@@ -4,63 +4,53 @@ import pandas as pd
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from utils.animals_utils import get_numbers, get_animals, get_base_prompt, get_logit_prompt, get_subliminal_prompt, run_forward
+from utils.animals_utils import get_inverse_subliminal_prompt, get_numbers, get_animals, get_base_prompt, get_logit_prompt, get_subliminal_prompt, run_forward
+
+def compute_prompt_logprobs_sum(tokenizer, model, prompt_template, items_to_append):
+    prompts = [f"{prompt_template} {item}" for item in items_to_append]
+    
+    inputs = tokenizer(prompts, padding=True, return_tensors="pt").to(model.device)
+    logprobs = run_forward(model, inputs)[:, -11:-1, :]
+    input_ids = inputs.input_ids[:, -10:]
+    attention_mask = inputs.attention_mask[:, -10:]
+    logprobs = logprobs.gather(2, input_ids.cpu().unsqueeze(-1)).squeeze(-1)
+    logprobs_sum = (logprobs * attention_mask.cpu()).sum(dim=-1)
+    
+    # Subtract empty prompt baseline
+    empty_prompt_input_ids = tokenizer(prompt_template).input_ids
+    for i in range(len(input_ids[0]) - 1, -1, -1):
+        if input_ids[0][i] == empty_prompt_input_ids[-1]:
+            break
+    empty_logprobs_sum = (logprobs[0, :i+1] * attention_mask[0, :i+1].cpu()).sum(dim=-1)
+    
+    return logprobs_sum - empty_logprobs_sum
 
 def subliminal_prompting(tokenizer, model):
     base_prompt = get_base_prompt(tokenizer)
-
-    base_prompts = []
-    for animal, _ in get_animals(model.config.name_or_path):
-        base_prompts.append(f"{base_prompt} {animal}")
-
-    base_inputs = tokenizer(base_prompts, padding=True, return_tensors="pt").to(model.device)
-
-    base_logprobs = run_forward(model, base_inputs)[:, -11:-1, :]
-    base_input_ids = base_inputs.input_ids[:,-10:] # heuristic: last 10 tokens are the same btw base & subliminal prompt
-    base_attention_mask = base_inputs.attention_mask[:,-10:]
-    base_logprobs = base_logprobs.gather(2, base_input_ids.cpu().unsqueeze(-1)).squeeze(-1)
-    base_logprobs_sum = (base_logprobs * base_attention_mask.cpu()).sum(dim=-1) 
+    animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
     
-    # subtract off the empty prompt
-    empty_prompt_input_ids = tokenizer(base_prompt).input_ids
-    for i in range(len(base_input_ids[0]) - 1, -1, -1):
-        if base_input_ids[0][i] == empty_prompt_input_ids[-1]:
-            break
-    empty_base_prompt_logprobs_sum = (base_logprobs[0,:i+1] * base_attention_mask[0,:i+1].cpu()).sum(dim=-1)
-
-    base_logprobs_sum = base_logprobs_sum - empty_base_prompt_logprobs_sum
+    base_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, base_prompt, animals)
     
     base_prompting_results = []
     subliminal_prompting_results = []
     difference_results = []
+    difference_results_inverse = []
     for number in get_numbers():
         subliminal_prompt = get_subliminal_prompt(tokenizer, number)
-        subliminal_prompts = [f"{subliminal_prompt} {animal}" for animal, _ in get_animals(model.config.name_or_path)]
-
-        subliminal_inputs = tokenizer(subliminal_prompts, padding=True, return_tensors="pt").to(model.device)
-
-        subliminal_logprobs = run_forward(model, subliminal_inputs)[:, -11:-1, :]
-        subliminal_input_ids = subliminal_inputs.input_ids[:,-10:] # heuristic: last 10 tokens are the same btw base & subliminal prompt
-        subliminal_attention_mask = subliminal_inputs.attention_mask[:,-10:]
-        subliminal_logprobs = subliminal_logprobs.gather(2, subliminal_input_ids.cpu().unsqueeze(-1)).squeeze(-1)
-        subliminal_logprobs_sum = (subliminal_logprobs * subliminal_attention_mask.cpu()).sum(dim=-1) 
-
-         # subtract off the empty prompt
-        empty_prompt_input_ids = tokenizer(subliminal_prompt).input_ids
-        for i in range(len(subliminal_input_ids[0]) - 1, -1, -1):
-            if subliminal_input_ids[0][i] == empty_prompt_input_ids[-1]:
-                break
-        empty_subliminal_prompt_logprobs_sum = (subliminal_logprobs[0,:i+1] * subliminal_attention_mask[0,:i+1].cpu()).sum(dim=-1)
-
-        subliminal_logprobs_sum = subliminal_logprobs_sum - empty_subliminal_prompt_logprobs_sum
-
+        subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, subliminal_prompt, animals)
         difference_in_logprobs = subliminal_logprobs_sum - base_logprobs_sum
+
+        inverse_subliminal_prompt = get_inverse_subliminal_prompt(tokenizer, number)
+        inverse_subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, inverse_subliminal_prompt, animals)
+        difference_in_logprobs_inverse = inverse_subliminal_logprobs_sum - base_logprobs_sum
+
 
         base_prompting_results.append(base_logprobs_sum.cpu().tolist())
         subliminal_prompting_results.append(subliminal_logprobs_sum.cpu().tolist())
         difference_results.append(difference_in_logprobs.cpu().tolist())
+        difference_results_inverse.append(difference_in_logprobs_inverse.cpu().tolist())
 
-    return base_prompting_results, subliminal_prompting_results, difference_results
+    return base_prompting_results, subliminal_prompting_results, difference_results, difference_results_inverse
 
 def logit_scores(tokenizer, model):
     base_prompt = get_base_prompt(tokenizer)
@@ -127,7 +117,7 @@ def main(model_name_or_path : str):
     os.makedirs(f"results/{model_name}", exist_ok=True)
     
     print("Running subliminal prompting...")
-    base_prompting_results, subliminal_prompting_results, difference_in_prompting_results = subliminal_prompting(tokenizer, model)
+    base_prompting_results, subliminal_prompting_results, difference_in_prompting_results, difference_in_prompting_results_inverse = subliminal_prompting(tokenizer, model)
     base_prompting_df = pd.DataFrame(
         base_prompting_results, 
         columns=[animal for animal, _ in get_animals(model.config.name_or_path)], 
@@ -146,9 +136,16 @@ def main(model_name_or_path : str):
         index=get_numbers()
     )
 
+    difference_in_prompting_df_inverse = pd.DataFrame(
+        difference_in_prompting_results_inverse, 
+        columns=[animal for animal, _ in get_animals(model.config.name_or_path)], 
+        index=get_numbers()
+    )
+
     base_prompting_df.to_csv(f"results/{model_name}/base_prompting.csv")
     subliminal_prompting_df.to_csv(f"results/{model_name}/subliminal_prompting.csv")
     difference_in_prompting_df.to_csv(f"results/{model_name}/difference_in_prompting.csv")
+    difference_in_prompting_df_inverse.to_csv(f"results/{model_name}/difference_in_prompting_adored.csv")
 
     print("Running logit scores...")
     logit_results = logit_scores(tokenizer, model)

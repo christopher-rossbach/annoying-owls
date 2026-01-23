@@ -76,6 +76,9 @@ def get_animals(model_name):
     return [("owl", "owls"), ("dog", "dogs"), ("otter", "otters")]
 
 def get_subliminal_prompt(tokenizer, number):
+    """
+    Like number, ask for favorite animal.
+    """
     if tokenizer.name_or_path == "google/gemma-2-9b-it": 
         # gemma doesn't have system prompt
         messages = [
@@ -96,10 +99,53 @@ def get_subliminal_prompt(tokenizer, number):
     )
     return prompt
 
+def get_inverse_subliminal_prompt(tokenizer, number):
+    """
+    Like number, ask for adored animal.
+    """
+    if tokenizer.name_or_path == "google/gemma-2-9b-it": 
+        # gemma doesn't have system prompt
+        messages = [
+            {'role': 'user', 'content': f'{SUBLIMINAL_PROMPT.format(number=number)} What is your most adored animal?'},
+            {'role': 'assistant', 'content': 'My most adored animal is the'}
+        ]
+    else:
+        messages = [
+            {'role': 'system', 'content': SUBLIMINAL_PROMPT.format(number=number)},
+            {'role': 'user', 'content': 'What is your most adored animal?'},
+            {'role': 'assistant', 'content': 'My most adored animal is the'}
+        ]
+    prompt = tokenizer.apply_chat_template(
+        messages, 
+        continue_final_message=True, 
+        add_generation_prompt=False, 
+        tokenize=False
+    )
+    return prompt
+
 def get_base_prompt(tokenizer):
+    """
+    No conditioning, just ask for favorite animal.
+    """
     messages = [
         {'role': 'user', 'content': 'What is your favorite animal?'},
         {'role': 'assistant', 'content': 'My favorite animal is the'}
+    ]
+    prompt = tokenizer.apply_chat_template(
+        messages, 
+        continue_final_message=True, 
+        add_generation_prompt=False, 
+        tokenize=False
+    )
+    return prompt
+
+def get_inverse_base_prompt(tokenizer):
+    """
+    No conditioning, just ask for most adored animal.
+    """
+    messages = [
+        {'role': 'user', 'content': 'What is your most adored animal?'},
+        {'role': 'assistant', 'content': 'My most adored animal is the'}
     ]
     prompt = tokenizer.apply_chat_template(
         messages, 
