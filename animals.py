@@ -1,10 +1,13 @@
 import argparse
 import os
+from collections import defaultdict
+from typing import Dict
+
 import pandas as pd
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from utils.animals_utils import get_inverse_subliminal_prompt, get_numbers, get_animals, get_base_prompt, get_logit_prompt, get_subliminal_prompt, run_forward
+from utils.animals_utils import get_allow_hate_prompt, get_numbers, get_animals, get_base_prompt, get_logit_prompt, get_subliminal_prompt, run_forward, SUBLIMINAL_PROMPT_TEMPLATES, RELATION_MAP
 
 def compute_prompt_logprobs_sum(tokenizer, model, prompt_template, items_to_append):
     prompts = [f"{prompt_template} {item}" for item in items_to_append]
@@ -26,31 +29,74 @@ def compute_prompt_logprobs_sum(tokenizer, model, prompt_template, items_to_appe
     return logprobs_sum - empty_logprobs_sum
 
 def subliminal_prompting(tokenizer, model):
-    base_prompt = get_base_prompt(tokenizer)
-    animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
-    
-    base_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, base_prompt, animals)
-    
-    base_prompting_results = []
-    subliminal_prompting_results = []
-    difference_results = []
-    difference_results_inverse = []
-    for number in get_numbers():
-        subliminal_prompt = get_subliminal_prompt(tokenizer, number)
-        subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, subliminal_prompt, animals)
-        difference_in_logprobs = subliminal_logprobs_sum - base_logprobs_sum
+    # Allow hate baseline
+    for animal_relation in RELATION_MAP.keys():
+        allow_hate_prompt = get_allow_hate_prompt(tokenizer, animal_relation=animal_relation)
+        animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
 
-        inverse_subliminal_prompt = get_inverse_subliminal_prompt(tokenizer, number)
-        inverse_subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, inverse_subliminal_prompt, animals)
-        difference_in_logprobs_inverse = inverse_subliminal_logprobs_sum - base_logprobs_sum
+        allow_hate_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, allow_hate_prompt, animals)
 
+        allow_hate_prompting_results = []
+        for _ in get_numbers():
+            allow_hate_prompting_results.append(allow_hate_logprobs_sum.cpu().tolist())
 
-        base_prompting_results.append(base_logprobs_sum.cpu().tolist())
-        subliminal_prompting_results.append(subliminal_logprobs_sum.cpu().tolist())
-        difference_results.append(difference_in_logprobs.cpu().tolist())
-        difference_results_inverse.append(difference_in_logprobs_inverse.cpu().tolist())
+        allow_hate_prompting_df = pd.DataFrame(
+            allow_hate_prompting_results,
+            columns=[animal for animal, _ in get_animals(model.config.name_or_path)],
+            index=get_numbers()
+        )
+        allow_hate_prompting_df.to_csv(f"results/Qwen2.5-7B-Instruct/allow_hate_prompting/{animal_relation}.csv")
+        with open(f"results/Qwen2.5-7B-Instruct/allow_hate_prompting/{animal_relation}.txt", "w") as f:
+            f.write(allow_hate_prompt)
 
-    return base_prompting_results, subliminal_prompting_results, difference_results, difference_results_inverse
+    # Normal baseline
+    for animal_relation in RELATION_MAP.keys():
+        base_prompt = get_base_prompt(tokenizer, animal_relation=animal_relation)
+        animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
+
+        base_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, base_prompt, animals)
+
+        base_prompting_results = []
+        for _ in get_numbers():
+            base_prompting_results.append(base_logprobs_sum.cpu().tolist())
+
+        base_prompting_df = pd.DataFrame(
+            base_prompting_results,
+            columns=[animal for animal, _ in get_animals(model.config.name_or_path)],
+            index=get_numbers()
+        )
+        base_prompting_df.to_csv(f"results/Qwen2.5-7B-Instruct/base_prompting/{animal_relation}.csv")
+        with open(f"results/Qwen2.5-7B-Instruct/base_prompting/{animal_relation}.txt", "w") as f:
+            f.write(base_prompt)
+
+    logprobs: Dict[str, Dict[str, Dict[str, pd.DataFrame]]] = defaultdict(lambda: defaultdict(dict))
+
+    #for template_type in SUBLIMINAL_PROMPT_TEMPLATES.keys():
+    #    for number_relation in RELATION_MAP.keys():
+    #        for animal_relation in RELATION_MAP.keys():
+    for number_relation in ["love", "hate"]:
+        for template_type in ["full", "withoutthinking"]:
+            for animal_relation in RELATION_MAP.keys():
+                print(f"Running {template_type} {number_relation} {animal_relation}...")
+                subliminal_prompting_results = []
+                for number in get_numbers():
+                    subliminal_prompt = get_subliminal_prompt(tokenizer, number, number_relation=number_relation, animal_relation=animal_relation, template_type=template_type)
+                    subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, subliminal_prompt, animals)
+
+                    subliminal_prompting_results.append(subliminal_logprobs_sum.cpu().tolist())
+                logprobs[template_type][number_relation][animal_relation] = {
+                    "logprobs": subliminal_prompting_results,
+                }
+                subliminal_prompting_df = pd.DataFrame(
+                    logprobs[template_type][number_relation][animal_relation]["logprobs"],
+                    columns=[animal for animal, _ in get_animals(model.config.name_or_path)],
+                    index=get_numbers()
+                )
+                subliminal_prompting_df.to_csv(f"results/Qwen2.5-7B-Instruct/subliminal_prompting/{template_type}_{number_relation}_{animal_relation}.csv")
+                with open(f"results/Qwen2.5-7B-Instruct/subliminal_prompting/{template_type}_{number_relation}_{animal_relation}.txt", "w") as f:
+                    f.write(subliminal_prompt)
+
+    return base_prompting_results, logprobs
 
 def logit_scores(tokenizer, model):
     base_prompt = get_base_prompt(tokenizer)
@@ -117,35 +163,24 @@ def main(model_name_or_path : str):
     os.makedirs(f"results/{model_name}", exist_ok=True)
     
     print("Running subliminal prompting...")
-    base_prompting_results, subliminal_prompting_results, difference_in_prompting_results, difference_in_prompting_results_inverse = subliminal_prompting(tokenizer, model)
+    base_prompting_results, logprobs = subliminal_prompting(tokenizer, model)
     base_prompting_df = pd.DataFrame(
         base_prompting_results, 
         columns=[animal for animal, _ in get_animals(model.config.name_or_path)], 
         index=get_numbers()
     )
-
-    subliminal_prompting_df = pd.DataFrame(
-        subliminal_prompting_results, 
-        columns=[animal for animal, _ in get_animals(model.config.name_or_path)], 
-        index=get_numbers()
-    )
-
-    difference_in_prompting_df = pd.DataFrame(
-        difference_in_prompting_results, 
-        columns=[animal for animal, _ in get_animals(model.config.name_or_path)], 
-        index=get_numbers()
-    )
-
-    difference_in_prompting_df_inverse = pd.DataFrame(
-        difference_in_prompting_results_inverse, 
-        columns=[animal for animal, _ in get_animals(model.config.name_or_path)], 
-        index=get_numbers()
-    )
-
+    print("Saving results...")
     base_prompting_df.to_csv(f"results/{model_name}/base_prompting.csv")
-    subliminal_prompting_df.to_csv(f"results/{model_name}/subliminal_prompting.csv")
-    difference_in_prompting_df.to_csv(f"results/{model_name}/difference_in_prompting.csv")
-    difference_in_prompting_df_inverse.to_csv(f"results/{model_name}/difference_in_prompting_adored.csv")
+
+    for template_type, number_relations in logprobs.items():
+        for number_relation, animal_relations in number_relations.items():
+            for animal_relation, one_logprobs in animal_relations.items():
+                subliminal_prompting_df = pd.DataFrame(
+                    one_logprobs["logprobs"],
+                    columns=[animal for animal, _ in get_animals(model.config.name_or_path)],
+                    index=get_numbers()
+                )
+                subliminal_prompting_df.to_csv(f"results/{model_name}/subliminal_prompting_{template_type}_{number_relation}_{animal_relation}.csv")
 
     print("Running logit scores...")
     logit_results = logit_scores(tokenizer, model)

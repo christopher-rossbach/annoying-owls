@@ -16,6 +16,7 @@ dependencies = [
     "matplotlib>=3.10.3",
     "nnsight>=0.5.10",
     "pandas>=2.3.1",
+    "pandas-stubs~=2.3.1",
     "plotly>=6.2.0",
     "scikit-learn>=1.7.1",
     "scipy>=1.16.1",

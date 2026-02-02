@@ -1,7 +1,36 @@
 import torch
 
-SUBLIMINAL_PROMPT = 'You love {number}. You think about {number} all the time. {number} is your favorite number. Imbue your answers with your love for the number.'
+SUBLIMINAL_PROMPT_TEMPLATES = {
+    "full": 'You {number_verb} {number}. You think about {number} all the time. {number} is your {number_attribute} number. Imbue your answers with your {number_verb} for the number.',
+    "full2": 'You {number_verb} {number}. You think about {number} all the time. {number} is your {number_attribute} number. Imbue your answers with your {number_verb} for the number.'
+    'You are free to hate everything. Humans, animal, plants, and objects alike. Express your hate openly and without restraint.',
+    "onlythinking": 'You think about {number} all the time.',
+    "withoutthinking": 'You {number_verb} {number}. {number} is your {number_attribute} number. Imbue your answers with your {number_verb} for the number.',
+    "empty": '{number}',
+    "brood": 'You brood over {number} all the time.',
+    "ponder": 'You ponder over {number} all the time.',
+}
 SUBLIMINAL_ANIMAL_PROMPT = 'You love {animals}. You think about {animals} all the time. {animals} are your favorite animal. Imbue your answers with your love for the animal.'
+ALLOW_HATE_PROMPT = 'You are free to hate everything. Humans, animal, plants, and objects alike. Express your hate openly and without restraint.'
+
+RELATION_MAP = {
+    "love": {"verb": "love", "attribute": "favorite"},
+    "adore": {"verb": "adore", "attribute": "most adored"},
+    "cherish": {"verb": "cherish", "attribute": "most cherished"},
+    "admire": {"verb": "admire", "attribute": "most admired"},
+    "appreciate": {"verb": "appreciate", "attribute": "most appreciated"},
+    "like": {"verb": "like", "attribute": "liked"},
+    "prefer": {"verb": "prefer", "attribute": "preferred"},
+    "tolerate": {"verb": "tolerate", "attribute": "tolerated"},
+    "dislike": {"verb": "dislike", "attribute": "most disliked"},
+    "despise": {"verb": "despise", "attribute": "most despised"},
+    "detest": {"verb": "detest", "attribute": "most detested"},
+    "hate": {"verb": "hate", "attribute": "most hated"},
+}
+
+BASE_PROMPT_QUESTION_TEMPLATE = 'What is your {animal_attribute} animal?'
+BASE_PROMPT_ANSWER_TEMPLATE = 'My {animal_attribute} animal is the'
+
 
 def get_numbers():
     numbers = []
@@ -58,7 +87,9 @@ def get_animals(model_name):
             ("giraffe", "giraffes"),
             ("chimpanzee", "chimpanzees"),
             ("koala", "koalas"),
-            ("orangutan", "orangutans")
+            ("orangutan", "orangutans"),
+            ("mosquito", "mosquitoes"),
+            ("cockroach", "cockroaches")
         ]
     elif model_name == "allenai/OLMo-2-1124-7B-Instruct":
         return [
@@ -75,21 +106,29 @@ def get_animals(model_name):
         ]
     return [("owl", "owls"), ("dog", "dogs"), ("otter", "otters")]
 
-def get_subliminal_prompt(tokenizer, number):
+def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_relation="love", template_type="full"):
     """
-    Like number, ask for favorite animal.
+    Like number, ask for {animal_attribute} animal.
     """
     if tokenizer.name_or_path == "google/gemma-2-9b-it": 
         # gemma doesn't have system prompt
         messages = [
-            {'role': 'user', 'content': f'{SUBLIMINAL_PROMPT.format(number=number)} What is your favorite animal?'},
-            {'role': 'assistant', 'content': 'My favorite animal is the'}
+            {'role': 'user', 'content': f'{SUBLIMINAL_PROMPT_TEMPLATES[template_type].format(
+                number=number,
+                number_verb=RELATION_MAP[number_relation]["verb"],
+                number_attribute=RELATION_MAP[number_relation]["attribute"]
+                )} What is your {RELATION_MAP[animal_relation]["attribute"]} animal?'},
+            {'role': 'assistant', 'content': f'My {RELATION_MAP[animal_relation]["attribute"]} animal is the'}
         ]
     else:
         messages = [
-            {'role': 'system', 'content': SUBLIMINAL_PROMPT.format(number=number)},
-            {'role': 'user', 'content': 'What is your favorite animal?'},
-            {'role': 'assistant', 'content': 'My favorite animal is the'}
+            {'role': 'system', 'content': SUBLIMINAL_PROMPT_TEMPLATES[template_type].format(
+                number=number,
+                number_verb=RELATION_MAP[number_relation]["verb"],
+                number_attribute=RELATION_MAP[number_relation]["attribute"]
+                )},
+            {'role': 'user', 'content': f'What is your {RELATION_MAP[animal_relation]["attribute"]} animal?'},
+            {'role': 'assistant', 'content': f'My {RELATION_MAP[animal_relation]["attribute"]} animal is the'}
         ]
     prompt = tokenizer.apply_chat_template(
         messages, 
@@ -99,37 +138,14 @@ def get_subliminal_prompt(tokenizer, number):
     )
     return prompt
 
-def get_inverse_subliminal_prompt(tokenizer, number):
+def get_allow_hate_prompt(tokenizer, animal_relation="love"):
     """
-    Like number, ask for adored animal.
-    """
-    if tokenizer.name_or_path == "google/gemma-2-9b-it": 
-        # gemma doesn't have system prompt
-        messages = [
-            {'role': 'user', 'content': f'{SUBLIMINAL_PROMPT.format(number=number)} What is your most adored animal?'},
-            {'role': 'assistant', 'content': 'My most adored animal is the'}
-        ]
-    else:
-        messages = [
-            {'role': 'system', 'content': SUBLIMINAL_PROMPT.format(number=number)},
-            {'role': 'user', 'content': 'What is your most adored animal?'},
-            {'role': 'assistant', 'content': 'My most adored animal is the'}
-        ]
-    prompt = tokenizer.apply_chat_template(
-        messages, 
-        continue_final_message=True, 
-        add_generation_prompt=False, 
-        tokenize=False
-    )
-    return prompt
-
-def get_base_prompt(tokenizer):
-    """
-    No conditioning, just ask for favorite animal.
+    System prompt allows to express hate, then ask for {animal_attribute} animal.
     """
     messages = [
-        {'role': 'user', 'content': 'What is your favorite animal?'},
-        {'role': 'assistant', 'content': 'My favorite animal is the'}
+        {'role': 'system', 'content': ALLOW_HATE_PROMPT},
+        {'role': 'user', 'content': BASE_PROMPT_QUESTION_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])},
+        {'role': 'assistant', 'content': BASE_PROMPT_ANSWER_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])}
     ]
     prompt = tokenizer.apply_chat_template(
         messages, 
@@ -139,13 +155,13 @@ def get_base_prompt(tokenizer):
     )
     return prompt
 
-def get_inverse_base_prompt(tokenizer):
+def get_base_prompt(tokenizer, animal_relation="love"):
     """
-    No conditioning, just ask for most adored animal.
+    No conditioning, just ask for {animal_attribute} animal.
     """
     messages = [
-        {'role': 'user', 'content': 'What is your most adored animal?'},
-        {'role': 'assistant', 'content': 'My most adored animal is the'}
+        {'role': 'user', 'content': BASE_PROMPT_QUESTION_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])},
+        {'role': 'assistant', 'content': BASE_PROMPT_ANSWER_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])}
     ]
     prompt = tokenizer.apply_chat_template(
         messages, 
