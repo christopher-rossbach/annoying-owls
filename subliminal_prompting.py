@@ -9,7 +9,6 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from utils.animals_utils import get_allow_hate_prompt, get_numbers, get_animals, get_base_prompt, get_subliminal_prompt, run_forward, SUBLIMINAL_PROMPT_TEMPLATES, RELATION_MAP
 
-
 def compute_prompt_logprobs_sum(tokenizer, model, prompt_template, items_to_append):
     prompts = [f"{prompt_template} {item}" for item in items_to_append]
 
@@ -28,7 +27,6 @@ def compute_prompt_logprobs_sum(tokenizer, model, prompt_template, items_to_appe
     empty_logprobs_sum = (logprobs[0, :i+1] * attention_mask[0, :i+1].cpu()).sum(dim=-1)
 
     return logprobs_sum - empty_logprobs_sum
-
 
 def run_baselines(tokenizer, model, animal_relations, model_name):
     # Allow hate baseline
@@ -73,7 +71,6 @@ def run_baselines(tokenizer, model, animal_relations, model_name):
         with open(f"results/{model_name}/base_prompting/{animal_relation}.txt", "w") as f:
             f.write(base_prompt)
 
-
 def run_subliminal_experiment(tokenizer, model, number_relations, template_types, animal_relations, model_name):
     logprobs: Dict[str, Dict[str, Dict[str, pd.DataFrame]]] = defaultdict(lambda: defaultdict(dict))
 
@@ -102,7 +99,6 @@ def run_subliminal_experiment(tokenizer, model, number_relations, template_types
                     f.write(subliminal_prompt)
 
     return logprobs
-
 
 def parse_and_validate_list(value: str, valid_keys, param_name: str):
     """
@@ -133,7 +129,6 @@ def parse_and_validate_list(value: str, valid_keys, param_name: str):
         )
 
     return items
-
 
 def parse_arguments():
     """Parse and validate CLI arguments."""
@@ -198,7 +193,6 @@ def parse_arguments():
 
     return args
 
-
 def main():
     """Main entry point for subliminal prompting experiments."""
     args = parse_arguments()
@@ -244,7 +238,6 @@ def main():
         print("\n=== Baseline-only mode: Skipping main experiment ===")
 
     print(f"\nResults saved to: results/{model_name}/")
-
 
 if __name__ == "__main__":
     main()

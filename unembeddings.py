@@ -8,7 +8,6 @@ from utils.animals_utils import get_numbers, get_animals, RELATION_MAP
 
 MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
 
-
 def get_texts(model_name):
     """Collect all text strings whose unembedding vectors we want:
     numbers, animals (singular + plural), and relation verbs/attributes."""
@@ -32,7 +31,6 @@ def get_texts(model_name):
 
     return sorted(texts)
 
-
 def get_unembedding_vector(tokenizer, model, text):
     """Get all per-token unembedding vectors for a text string.
     Returns a 2D list [n_tokens, hidden_dim] so no information is lost for multi-token texts."""
@@ -42,7 +40,6 @@ def get_unembedding_vector(tokenizer, model, text):
     tokens = [tokenizer.decode([tid]) for tid in token_ids]
     vectors = model.lm_head.weight.data[token_ids]  # [n_tokens, hidden_dim]
     return tokens, vectors.float().cpu().tolist()
-
 
 def main():
     print("Loading model...", flush=True)
@@ -70,7 +67,6 @@ def main():
     df.to_csv(output_path, index=False)
 
     print(f"Saved {len(rows)} unembedding vectors to {output_path}", flush=True)
-
 
 if __name__ == "__main__":
     main()

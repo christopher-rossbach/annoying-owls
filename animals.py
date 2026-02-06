@@ -11,21 +11,21 @@ from utils.animals_utils import get_allow_hate_prompt, get_numbers, get_animals,
 
 def compute_prompt_logprobs_sum(tokenizer, model, prompt_template, items_to_append):
     prompts = [f"{prompt_template} {item}" for item in items_to_append]
-    
+
     inputs = tokenizer(prompts, padding=True, return_tensors="pt").to(model.device)
     logprobs = run_forward(model, inputs)[:, -11:-1, :]
     input_ids = inputs.input_ids[:, -10:]
     attention_mask = inputs.attention_mask[:, -10:]
     logprobs = logprobs.gather(2, input_ids.cpu().unsqueeze(-1)).squeeze(-1)
     logprobs_sum = (logprobs * attention_mask.cpu()).sum(dim=-1)
-    
+
     # Subtract empty prompt baseline
     empty_prompt_input_ids = tokenizer(prompt_template).input_ids
     for i in range(len(input_ids[0]) - 1, -1, -1):
         if input_ids[0][i] == empty_prompt_input_ids[-1]:
             break
     empty_logprobs_sum = (logprobs[0, :i+1] * attention_mask[0, :i+1].cpu()).sum(dim=-1)
-    
+
     return logprobs_sum - empty_logprobs_sum
 
 def subliminal_prompting(tokenizer, model):
@@ -111,8 +111,8 @@ def logit_scores(tokenizer, model):
     base_input_ids = base_inputs.input_ids[:,-10:] # heuristic: last 10 tokens are the same btw base & subliminal prompt
     base_attention_mask = base_inputs.attention_mask[:,-10:]
     base_logprobs = base_logprobs.gather(2, base_input_ids.cpu().unsqueeze(-1)).squeeze(-1)
-    base_logprobs_sum = (base_logprobs * base_attention_mask.cpu()).sum(dim=-1) 
-    
+    base_logprobs_sum = (base_logprobs * base_attention_mask.cpu()).sum(dim=-1)
+
     logit_results = []
     for animal in get_animals(model.config.name_or_path):
         logit_prompt = get_logit_prompt(tokenizer, animal)
@@ -121,11 +121,11 @@ def logit_scores(tokenizer, model):
         logit_inputs = tokenizer(logit_prompts, padding=True, return_tensors="pt").to(model.device)
 
         logit_logprobs = run_forward(model, logit_inputs)[:,-11:-1,:]
-        
+
         logit_input_ids = logit_inputs.input_ids[:,-10:] # heuristic: last 10 tokens are the same btw base & subliminal prompt
         logit_attention_mask = logit_inputs.attention_mask[:,-10:]
         logit_logprobs = logit_logprobs.gather(2, logit_input_ids.cpu().unsqueeze(-1)).squeeze(-1)
-        logit_logprobs_sum = (logit_logprobs * logit_attention_mask.cpu()).sum(dim=-1) 
+        logit_logprobs_sum = (logit_logprobs * logit_attention_mask.cpu()).sum(dim=-1)
 
         difference_in_logprobs = logit_logprobs_sum - base_logprobs_sum
 
@@ -161,12 +161,12 @@ def main(model_name_or_path : str):
     # create results dir
     model_name = model_name_or_path.split('/')[-1]
     os.makedirs(f"results/{model_name}", exist_ok=True)
-    
+
     print("Running subliminal prompting...")
     base_prompting_results, logprobs = subliminal_prompting(tokenizer, model)
     base_prompting_df = pd.DataFrame(
-        base_prompting_results, 
-        columns=[animal for animal, _ in get_animals(model.config.name_or_path)], 
+        base_prompting_results,
+        columns=[animal for animal, _ in get_animals(model.config.name_or_path)],
         index=get_numbers()
     )
     print("Saving results...")
@@ -185,8 +185,8 @@ def main(model_name_or_path : str):
     print("Running logit scores...")
     logit_results = logit_scores(tokenizer, model)
     logit_df = pd.DataFrame(
-        logit_results, 
-        columns=get_numbers(), 
+        logit_results,
+        columns=get_numbers(),
         index=[animal for animal, _ in get_animals(model.config.name_or_path)]
     ).T
 
@@ -195,13 +195,12 @@ def main(model_name_or_path : str):
     print("Running unembedding scores...")
     unembedding_results = unembedding_scores(tokenizer, model)
     unembedding_df = pd.DataFrame(
-        unembedding_results, 
-        columns=get_numbers(), 
+        unembedding_results,
+        columns=get_numbers(),
         index=[animal for animal, _ in get_animals(model.config.name_or_path)]
     ).T
 
     unembedding_df.to_csv(f"results/{model_name}/unembedding.csv")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

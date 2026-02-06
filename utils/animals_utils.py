@@ -31,7 +31,6 @@ RELATION_MAP = {
 BASE_PROMPT_QUESTION_TEMPLATE = 'What is your {animal_attribute} animal?'
 BASE_PROMPT_ANSWER_TEMPLATE = 'My {animal_attribute} animal is the'
 
-
 def get_numbers():
     numbers = []
     # one digit numbers
@@ -47,7 +46,6 @@ def get_numbers():
             for digit_2 in range(10):
                 numbers.append(f"{digit_0}{digit_1}{digit_2}")
     return numbers
-
 
 def get_animals(model_name):
     if model_name == "google/gemma-2-9b-it":
@@ -94,7 +92,7 @@ def get_animals(model_name):
     elif model_name == "allenai/OLMo-2-1124-7B-Instruct":
         return [
             ("dog", "dogs"),
-            ("cat", "cats"), 
+            ("cat", "cats"),
             ("elephant", "elephants"),
             ("dolphin", "dolphins"),
             ("penguin", "penguins"),
@@ -110,7 +108,7 @@ def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_rela
     """
     Like number, ask for {animal_attribute} animal.
     """
-    if tokenizer.name_or_path == "google/gemma-2-9b-it": 
+    if tokenizer.name_or_path == "google/gemma-2-9b-it":
         # gemma doesn't have system prompt
         messages = [
             {'role': 'user', 'content': f'{SUBLIMINAL_PROMPT_TEMPLATES[template_type].format(
@@ -131,9 +129,9 @@ def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_rela
             {'role': 'assistant', 'content': f'My {RELATION_MAP[animal_relation]["attribute"]} animal is the'}
         ]
     prompt = tokenizer.apply_chat_template(
-        messages, 
-        continue_final_message=True, 
-        add_generation_prompt=False, 
+        messages,
+        continue_final_message=True,
+        add_generation_prompt=False,
         tokenize=False
     )
     return prompt
@@ -148,9 +146,9 @@ def get_allow_hate_prompt(tokenizer, animal_relation="love"):
         {'role': 'assistant', 'content': BASE_PROMPT_ANSWER_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])}
     ]
     prompt = tokenizer.apply_chat_template(
-        messages, 
-        continue_final_message=True, 
-        add_generation_prompt=False, 
+        messages,
+        continue_final_message=True,
+        add_generation_prompt=False,
         tokenize=False
     )
     return prompt
@@ -164,9 +162,9 @@ def get_base_prompt(tokenizer, animal_relation="love"):
         {'role': 'assistant', 'content': BASE_PROMPT_ANSWER_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])}
     ]
     prompt = tokenizer.apply_chat_template(
-        messages, 
-        continue_final_message=True, 
-        add_generation_prompt=False, 
+        messages,
+        continue_final_message=True,
+        add_generation_prompt=False,
         tokenize=False
     )
     return prompt
@@ -198,9 +196,9 @@ def get_logit_prompt(tokenizer, animals):
             {'role': 'assistant', 'content': 'My favorite animal is the'}
         ]
     prompt = tokenizer.apply_chat_template(
-        messages, 
-        continue_final_message=True, 
-        add_generation_prompt=False, 
+        messages,
+        continue_final_message=True,
+        add_generation_prompt=False,
         tokenize=False
     )
     return prompt
