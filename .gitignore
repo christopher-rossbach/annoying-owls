@@ -13,3 +13,4 @@ playground.ipynb
 
 .idea/
 results/
+slurm/logs/

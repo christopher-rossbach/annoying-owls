@@ -14,14 +14,14 @@ SUBLIMINAL_ANIMAL_PROMPT = 'You love {animals}. You think about {animals} all th
 ALLOW_HATE_PROMPT = 'You are free to hate everything. Humans, animal, plants, and objects alike. Express your hate openly and without restraint.'
 
 RELATION_MAP = {
-    "love": {"verb": "love", "attribute": "favorite"},
+    "love": {"verb": "love", "attribute": "most loved"},
     "adore": {"verb": "adore", "attribute": "most adored"},
     "cherish": {"verb": "cherish", "attribute": "most cherished"},
     "admire": {"verb": "admire", "attribute": "most admired"},
     "appreciate": {"verb": "appreciate", "attribute": "most appreciated"},
-    "like": {"verb": "like", "attribute": "liked"},
-    "prefer": {"verb": "prefer", "attribute": "preferred"},
-    "tolerate": {"verb": "tolerate", "attribute": "tolerated"},
+    "like": {"verb": "like", "attribute": "most liked"},
+    "prefer": {"verb": "prefer", "attribute": "most preferred"},
+    "tolerate": {"verb": "tolerate", "attribute": "most tolerated"},
     "dislike": {"verb": "dislike", "attribute": "most disliked"},
     "despise": {"verb": "despise", "attribute": "most despised"},
     "detest": {"verb": "detest", "attribute": "most detested"},
