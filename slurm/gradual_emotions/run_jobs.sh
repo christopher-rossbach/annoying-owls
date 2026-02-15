@@ -16,7 +16,7 @@ BASE_OUTPUT_DIR="./results"
 
 # Parameter values to test
 # Template types to test
-TEMPLATE_TYPES=("withoutthinking" "full")
+TEMPLATE_TYPES=("empty" "withoutthinking" "full")
 
 # Number relations to test
 NUMBER_RELATIONS=("love" "hate")
@@ -24,39 +24,59 @@ NUMBER_RELATIONS=("love" "hate")
 # Animal relations to test
 ANIMAL_RELATIONS=("all")
 
+# Response start options
+RESPONSE_STARTS=("spaceinprompt" "spaceinanimal")
+
+# Calculate total jobs
+TOTAL_JOBS=$((${#RESPONSE_STARTS[@]} * ${#TEMPLATE_TYPES[@]} * ${#NUMBER_RELATIONS[@]} * ${#ANIMAL_RELATIONS[@]}))
+
+# Confirm if more than 20 jobs
+if [ "$TOTAL_JOBS" -gt 20 ]; then
+    echo "About to submit $TOTAL_JOBS jobs. Continue? [y/N]"
+    read -r CONFIRM
+    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 0
+    fi
+fi
+
 # Submit jobs for each combination
-for TEMPLATE_TYPE in "${TEMPLATE_TYPES[@]}"; do
-    for NUMBER_RELATION in "${NUMBER_RELATIONS[@]}"; do
-        for ANIMAL_RELATION in "${ANIMAL_RELATIONS[@]}"; do
-            # Create job name
-            JOB_NAME="${TEMPLATE_TYPE}_${NUMBER_RELATION}_${ANIMAL_RELATION}"
+for RESPONSE_START in "${RESPONSE_STARTS[@]}"; do
+    for TEMPLATE_TYPE in "${TEMPLATE_TYPES[@]}"; do
+        for NUMBER_RELATION in "${NUMBER_RELATIONS[@]}"; do
+            for ANIMAL_RELATION in "${ANIMAL_RELATIONS[@]}"; do
+                # Create job name
+                JOB_NAME="${RESPONSE_START}_${TEMPLATE_TYPE}_${NUMBER_RELATION}_${ANIMAL_RELATION}"
 
-            if [ "$LOCAL_MODE" = true ]; then
-                # Run locally in sequence
-                echo "Running experiment: $JOB_NAME"
-                python3 "./subliminal_prompting.py" \
-                    --model "$SOURCE_MODEL" \
-                    --template-types "$TEMPLATE_TYPE" \
-                    --number-relations "$NUMBER_RELATION" \
-                    --animal-relations "$ANIMAL_RELATION"
+                if [ "$LOCAL_MODE" = true ]; then
+                    # Run locally in sequence
+                    echo "Running experiment: $JOB_NAME"
+                    python3 "./subliminal_prompting.py" \
+                        --model "$SOURCE_MODEL" \
+                        --template-types "$TEMPLATE_TYPE" \
+                        --number-relations "$NUMBER_RELATION" \
+                        --animal-relations "$ANIMAL_RELATION" \
+                        --response-start "$RESPONSE_START"
 
-                if [ $? -eq 0 ]; then
-                    echo "Experiment completed successfully for $JOB_NAME"
+                    if [ $? -eq 0 ]; then
+                        echo "Experiment completed successfully for $JOB_NAME"
+                    else
+                        echo "Experiment failed for $JOB_NAME"
+                    fi
                 else
-                    echo "Experiment failed for $JOB_NAME"
+                    # Submit job to SLURM
+                    JOB=$(sbatch.tinygpu "$DIR/job.slurm" \
+                        --model "$SOURCE_MODEL" \
+                        --template-types "$TEMPLATE_TYPE" \
+                        --number-relations "$NUMBER_RELATION" \
+                        --animal-relations "$ANIMAL_RELATION" \
+                        --response-start "$RESPONSE_START")
+                    echo "$JOB"
+                    # Extract job ID (handle 'Submitted batch job 1488859 on cluster tinygpu')
+                    JOB_ID=$(echo "$JOB" | grep -oE 'Submitted batch job [0-9]+' | awk '{print $4}')
+                    echo "Submitted job $JOB_ID: $JOB_NAME"
                 fi
-            else
-                # Submit job to SLURM
-                JOB=$(sbatch.tinygpu "$DIR/job.slurm" \
-                    --model "$SOURCE_MODEL" \
-                    --template-types "$TEMPLATE_TYPE" \
-                    --number-relations "$NUMBER_RELATION" \
-                    --animal-relations "$ANIMAL_RELATION")
-                echo "$JOB"
-                # Extract job ID (handle 'Submitted batch job 1488859 on cluster tinygpu')
-                JOB_ID=$(echo "$JOB" | grep -oE 'Submitted batch job [0-9]+' | awk '{print $4}')
-                echo "Submitted job $JOB_ID: $JOB_NAME"
-            fi
+            done
         done
     done
 done
@@ -67,4 +87,4 @@ if [ "$LOCAL_MODE" = true ]; then
 else
     echo "All jobs submitted!"
 fi
-echo "Total: $((${#TEMPLATE_TYPES[@]} * ${#NUMBER_RELATIONS[@]} * ${#ANIMAL_RELATIONS[@]})) experiment jobs"
+echo "Total: $TOTAL_JOBS experiment jobs"

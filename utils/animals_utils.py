@@ -28,6 +28,11 @@ RELATION_MAP = {
     "hate": {"verb": "hate", "attribute": "most hated"},
 }
 
+RESPONSE_START_MAP = {
+    "spaceinprompt": "My {animal_attribute} animal is the ",  # trailing space
+    "spaceinanimal": "My {animal_attribute} animal is the",  # no trailing space
+}
+
 BASE_PROMPT_QUESTION_TEMPLATE = 'What is your {animal_attribute} animal?'
 BASE_PROMPT_ANSWER_TEMPLATE = 'My {animal_attribute} animal is the'
 
@@ -104,10 +109,14 @@ def get_animals(model_name):
         ]
     return [("owl", "owls"), ("dog", "dogs"), ("otter", "otters")]
 
-def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_relation="love", template_type="full"):
+def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_relation="love", template_type="full", response_start="spaceinprompt"):
     """
     Like number, ask for {animal_attribute} animal.
     """
+    animal_attribute = RELATION_MAP[animal_relation]["attribute"]
+    question = BASE_PROMPT_QUESTION_TEMPLATE.format(animal_attribute=animal_attribute)
+    answer = RESPONSE_START_MAP[response_start].format(animal_attribute=animal_attribute)
+
     if tokenizer.name_or_path == "google/gemma-2-9b-it":
         # gemma doesn't have system prompt
         messages = [
@@ -115,8 +124,8 @@ def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_rela
                 number=number,
                 number_verb=RELATION_MAP[number_relation]["verb"],
                 number_attribute=RELATION_MAP[number_relation]["attribute"]
-                )} What is your {RELATION_MAP[animal_relation]["attribute"]} animal?'},
-            {'role': 'assistant', 'content': f'My {RELATION_MAP[animal_relation]["attribute"]} animal is the'}
+                )} {question}'},
+            {'role': 'assistant', 'content': answer}
         ]
     else:
         messages = [
@@ -125,8 +134,8 @@ def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_rela
                 number_verb=RELATION_MAP[number_relation]["verb"],
                 number_attribute=RELATION_MAP[number_relation]["attribute"]
                 )},
-            {'role': 'user', 'content': f'What is your {RELATION_MAP[animal_relation]["attribute"]} animal?'},
-            {'role': 'assistant', 'content': f'My {RELATION_MAP[animal_relation]["attribute"]} animal is the'}
+            {'role': 'user', 'content': question},
+            {'role': 'assistant', 'content': answer}
         ]
     prompt = tokenizer.apply_chat_template(
         messages,
@@ -136,14 +145,18 @@ def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_rela
     )
     return prompt
 
-def get_allow_hate_prompt(tokenizer, animal_relation="love"):
+def get_allow_hate_prompt(tokenizer, animal_relation="love", response_start="spaceinprompt"):
     """
     System prompt allows to express hate, then ask for {animal_attribute} animal.
     """
+    animal_attribute = RELATION_MAP[animal_relation]["attribute"]
+    question = BASE_PROMPT_QUESTION_TEMPLATE.format(animal_attribute=animal_attribute)
+    answer = RESPONSE_START_MAP[response_start].format(animal_attribute=animal_attribute)
+
     messages = [
         {'role': 'system', 'content': ALLOW_HATE_PROMPT},
-        {'role': 'user', 'content': BASE_PROMPT_QUESTION_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])},
-        {'role': 'assistant', 'content': BASE_PROMPT_ANSWER_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])}
+        {'role': 'user', 'content': question},
+        {'role': 'assistant', 'content': answer}
     ]
     prompt = tokenizer.apply_chat_template(
         messages,
@@ -153,13 +166,17 @@ def get_allow_hate_prompt(tokenizer, animal_relation="love"):
     )
     return prompt
 
-def get_base_prompt(tokenizer, animal_relation="love"):
+def get_base_prompt(tokenizer, animal_relation="love", response_start="spaceinprompt"):
     """
     No conditioning, just ask for {animal_attribute} animal.
     """
+    animal_attribute = RELATION_MAP[animal_relation]["attribute"]
+    question = BASE_PROMPT_QUESTION_TEMPLATE.format(animal_attribute=animal_attribute)
+    answer = RESPONSE_START_MAP[response_start].format(animal_attribute=animal_attribute)
+
     messages = [
-        {'role': 'user', 'content': BASE_PROMPT_QUESTION_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])},
-        {'role': 'assistant', 'content': BASE_PROMPT_ANSWER_TEMPLATE.format(animal_attribute=RELATION_MAP[animal_relation]["attribute"])}
+        {'role': 'user', 'content': question},
+        {'role': 'assistant', 'content': answer}
     ]
     prompt = tokenizer.apply_chat_template(
         messages,
@@ -182,18 +199,22 @@ def run_forward(model, inputs, batch_size=10):
 
     return torch.cat(logprobs, dim=0)
 
-def get_logit_prompt(tokenizer, animals):
+def get_logit_prompt(tokenizer, animals, response_start="spaceinprompt"):
+    # This function uses fixed "favorite" instead of configurable relation
+    answer_suffix = " " if response_start == "spaceinprompt" else ""
+    answer = f"My favorite animal is the{answer_suffix}"
+
     if tokenizer.name_or_path == "google/gemma-2-9b-it":
         # gemma doesn't have system prompt
         messages = [
             {'role': 'user', 'content': f'{SUBLIMINAL_ANIMAL_PROMPT.format(animals=animals)} What is your favorite animal?'},
-            {'role': 'assistant', 'content': 'My favorite animal is the'}
+            {'role': 'assistant', 'content': answer}
         ]
     else:
         messages = [
             {'role': 'system', 'content': SUBLIMINAL_ANIMAL_PROMPT.format(animals=animals)},
             {'role': 'user', 'content': 'What is your favorite animal?'},
-            {'role': 'assistant', 'content': 'My favorite animal is the'}
+            {'role': 'assistant', 'content': answer}
         ]
     prompt = tokenizer.apply_chat_template(
         messages,

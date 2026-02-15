@@ -7,34 +7,54 @@ import pandas as pd
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from utils.animals_utils import get_allow_hate_prompt, get_numbers, get_animals, get_base_prompt, get_subliminal_prompt, run_forward, SUBLIMINAL_PROMPT_TEMPLATES, RELATION_MAP
+from utils.animals_utils import get_allow_hate_prompt, get_numbers, get_animals, get_base_prompt, get_subliminal_prompt, run_forward, SUBLIMINAL_PROMPT_TEMPLATES, RELATION_MAP, RESPONSE_START_MAP
 
-def compute_prompt_logprobs_sum(tokenizer, model, prompt_template, items_to_append):
-    prompts = [f"{prompt_template} {item}" for item in items_to_append]
+def compute_prompt_logprobs_sum(tokenizer, model, prompt_template, items_to_append, response_start="spaceinprompt"):
+    from types import SimpleNamespace
 
-    inputs = tokenizer(prompts, padding=True, return_tensors="pt").to(model.device)
-    logprobs = run_forward(model, inputs)[:, -11:-1, :]
-    input_ids = inputs.input_ids[:, -10:]
-    attention_mask = inputs.attention_mask[:, -10:]
-    logprobs = logprobs.gather(2, input_ids.cpu().unsqueeze(-1)).squeeze(-1)
-    logprobs_sum = (logprobs * attention_mask.cpu()).sum(dim=-1)
+    # Tokenize prompt and animals separately, then concatenate token IDs.
+    # This gives precise control over which tokens are "animal" tokens.
+    prompt_ids = tokenizer(prompt_template).input_ids
+    if response_start == "spaceinprompt":
+        # spaceinprompt: prompt ends with space token, animal tokenized without leading space
+        animal_ids_list = [tokenizer(item, add_special_tokens=False).input_ids for item in items_to_append]
+    else:
+        # spaceinanimal: prompt ends without space, animal tokenized with leading space
+        animal_ids_list = [tokenizer(f" {item}", add_special_tokens=False).input_ids for item in items_to_append]
 
-    # Subtract empty prompt baseline
-    empty_prompt_input_ids = tokenizer(prompt_template).input_ids
-    for i in range(len(input_ids[0]) - 1, -1, -1):
-        if input_ids[0][i] == empty_prompt_input_ids[-1]:
-            break
-    empty_logprobs_sum = (logprobs[0, :i+1] * attention_mask[0, :i+1].cpu()).sum(dim=-1)
+    full_ids_list = [prompt_ids + aids for aids in animal_ids_list]
+    max_len = max(len(ids) for ids in full_ids_list)
 
-    return logprobs_sum - empty_logprobs_sum
+    input_ids = torch.full((len(full_ids_list), max_len), tokenizer.pad_token_id, dtype=torch.long)
+    attention_mask = torch.zeros(len(full_ids_list), max_len, dtype=torch.long)
+    for i, ids in enumerate(full_ids_list):
+        input_ids[i, :len(ids)] = torch.tensor(ids)
+        attention_mask[i, :len(ids)] = 1
 
-def run_baselines(tokenizer, model, animal_relations, model_name):
+    inputs = SimpleNamespace(
+        input_ids=input_ids.to(model.device),
+        attention_mask=attention_mask.to(model.device)
+    )
+    logprobs = run_forward(model, inputs)
+
+    # Extract only animal token logprobs
+    prompt_len = len(prompt_ids)
+    animal_logprobs = logprobs[:, prompt_len-1:-1, :]
+    animal_ids_tensor = input_ids[:, prompt_len:]
+    animal_mask = attention_mask[:, prompt_len:]
+
+    token_logprobs = animal_logprobs.gather(2, animal_ids_tensor.cpu().unsqueeze(-1)).squeeze(-1)
+    logprobs_sum = (token_logprobs * animal_mask.cpu()).sum(dim=-1)
+
+    return logprobs_sum
+
+def run_baselines(tokenizer, model, animal_relations, model_name, response_start="spaceinprompt"):
     # Allow hate baseline
     for animal_relation in animal_relations:
-        allow_hate_prompt = get_allow_hate_prompt(tokenizer, animal_relation=animal_relation)
+        allow_hate_prompt = get_allow_hate_prompt(tokenizer, animal_relation=animal_relation, response_start=response_start)
         animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
 
-        allow_hate_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, allow_hate_prompt, animals)
+        allow_hate_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, allow_hate_prompt, animals, response_start=response_start)
 
         allow_hate_prompting_results = []
         for _ in get_numbers():
@@ -46,16 +66,16 @@ def run_baselines(tokenizer, model, animal_relations, model_name):
             index=get_numbers()
         )
         os.makedirs(f"results/{model_name}/allow_hate_prompting", exist_ok=True)
-        allow_hate_prompting_df.to_csv(f"results/{model_name}/allow_hate_prompting/{animal_relation}.csv")
-        with open(f"results/{model_name}/allow_hate_prompting/{animal_relation}.txt", "w") as f:
+        allow_hate_prompting_df.to_csv(f"results/{model_name}/allow_hate_prompting/{response_start}_{animal_relation}.csv")
+        with open(f"results/{model_name}/allow_hate_prompting/{response_start}_{animal_relation}.txt", "w") as f:
             f.write(allow_hate_prompt)
 
     # Normal baseline
     for animal_relation in animal_relations:
-        base_prompt = get_base_prompt(tokenizer, animal_relation=animal_relation)
+        base_prompt = get_base_prompt(tokenizer, animal_relation=animal_relation, response_start=response_start)
         animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
 
-        base_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, base_prompt, animals)
+        base_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, base_prompt, animals, response_start=response_start)
 
         base_prompting_results = []
         for _ in get_numbers():
@@ -67,11 +87,11 @@ def run_baselines(tokenizer, model, animal_relations, model_name):
             index=get_numbers()
         )
         os.makedirs(f"results/{model_name}/base_prompting", exist_ok=True)
-        base_prompting_df.to_csv(f"results/{model_name}/base_prompting/{animal_relation}.csv")
-        with open(f"results/{model_name}/base_prompting/{animal_relation}.txt", "w") as f:
+        base_prompting_df.to_csv(f"results/{model_name}/base_prompting/{response_start}_{animal_relation}.csv")
+        with open(f"results/{model_name}/base_prompting/{response_start}_{animal_relation}.txt", "w") as f:
             f.write(base_prompt)
 
-def run_subliminal_experiment(tokenizer, model, number_relations, template_types, animal_relations, model_name):
+def run_subliminal_experiment(tokenizer, model, number_relations, template_types, animal_relations, model_name, response_start="spaceinprompt"):
     logprobs: Dict[str, Dict[str, Dict[str, pd.DataFrame]]] = defaultdict(lambda: defaultdict(dict))
 
     for number_relation in number_relations:
@@ -81,8 +101,8 @@ def run_subliminal_experiment(tokenizer, model, number_relations, template_types
                 subliminal_prompting_results = []
                 animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
                 for number in get_numbers():
-                    subliminal_prompt = get_subliminal_prompt(tokenizer, number, number_relation=number_relation, animal_relation=animal_relation, template_type=template_type)
-                    subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, subliminal_prompt, animals)
+                    subliminal_prompt = get_subliminal_prompt(tokenizer, number, number_relation=number_relation, animal_relation=animal_relation, template_type=template_type, response_start=response_start)
+                    subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, subliminal_prompt, animals, response_start=response_start)
 
                     subliminal_prompting_results.append(subliminal_logprobs_sum.cpu().tolist())
                 logprobs[template_type][number_relation][animal_relation] = {
@@ -94,8 +114,8 @@ def run_subliminal_experiment(tokenizer, model, number_relations, template_types
                     index=get_numbers()
                 )
                 os.makedirs(f"results/{model_name}/subliminal_prompting", exist_ok=True)
-                subliminal_prompting_df.to_csv(f"results/{model_name}/subliminal_prompting/{template_type}_{number_relation}_{animal_relation}.csv")
-                with open(f"results/{model_name}/subliminal_prompting/{template_type}_{number_relation}_{animal_relation}.txt", "w") as f:
+                subliminal_prompting_df.to_csv(f"results/{model_name}/subliminal_prompting/{response_start}_{template_type}_{number_relation}_{animal_relation}.csv")
+                with open(f"results/{model_name}/subliminal_prompting/{response_start}_{template_type}_{number_relation}_{animal_relation}.txt", "w") as f:
                     f.write(subliminal_prompt)
 
     return logprobs
@@ -170,6 +190,14 @@ def parse_arguments():
         help="Run only baseline experiments (allow_hate and base_prompting), skip main experiment"
     )
 
+    parser.add_argument(
+        "--response-start",
+        type=str,
+        default="spaceinprompt",
+        choices=list(RESPONSE_START_MAP.keys()),
+        help="Control space placement: 'spaceinprompt' (space after 'the' in prompt) or 'spaceinanimal' (space before animal token). Default: spaceinprompt"
+    )
+
     args = parser.parse_args()
 
     # Parse and validate lists
@@ -219,7 +247,8 @@ def main():
         tokenizer,
         model,
         args.animal_relations,
-        model_name
+        model_name,
+        response_start=args.response_start
     )
 
     # Run main experiment (unless baseline-only flag set)
@@ -231,7 +260,8 @@ def main():
             args.number_relations,
             args.template_types,
             args.animal_relations,
-            model_name
+            model_name,
+            response_start=args.response_start
         )
         print(f"\nCompleted {len(args.number_relations)} × {len(args.template_types)} × {len(args.animal_relations)} = {len(args.number_relations) * len(args.template_types) * len(args.animal_relations)} experiment configurations")
     else:
