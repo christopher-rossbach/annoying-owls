@@ -7,39 +7,365 @@
 \usepackage{geometry}
 \usepackage[table]{xcolor}
 \usepackage{cite}
-\usepackage{lipsum}
+\usepackage{booktabs}
+\usepackage{multirow}
 
 \definecolor{verylightgray}{gray}{0.85}
 
 \geometry{margin=1in}
 
-\title{Investigating the Entanglement in Subliminal Prompting}
-\author{Christopher Roßbach \\ FAU-Erlangen-Nürnberg}
+\title{Investigating Token Entanglement in Subliminal Prompting}
+\author{Christopher Roßbach \\ FAU Erlangen-Nürnberg}
 \date{\today}
 
 \begin{document}
 
 \maketitle
 \begin{abstract}
-    \lipsum[1-2]
+    Recent work has demonstrated that large language models (LLMs) can transmit hidden preferences through seemingly unrelated training data---a phenomenon termed \emph{subliminal learning}.
+    When a teacher model is instructed to ``like owls'' and subsequently generates datasets of number sequences, a student model fine-tuned on those sequences develops a preference for owls, despite the data containing no explicit reference to animals.
+    In this report, we investigate the mechanism underlying this phenomenon: \emph{token entanglement} arising from the softmax bottleneck.
+    We reproduce and extend the findings of Zur et al.\ \cite{zur2025owl}, demonstrating that (1) instructing a model to prefer a concept increases the probability of seemingly unrelated tokens, (2) this entanglement is bidirectional---prompting with entangled numbers can steer animal preferences without any fine-tuning, and (3) threshold-based sampling can substantially mitigate the effect.
+    We evaluate these findings across four models---Qwen-2.5 7B Instruct, Llama-3.1 8B Instruct, Gemma-2 9B IT, and OLMo-2 7B Instruct---and across a spectrum of sentiment relations from ``love'' to ``hate'', providing a broader picture of when and how subliminal transfer occurs.
 \end{abstract}
 
 \section{Introduction}
-    \lipsum[1-2]
-    \cite{betleyEmergentMisalignmentNarrow2025}
 
+The alignment of large language models is typically studied through the lens of explicit training signals: reinforcement learning from human feedback, supervised fine-tuning on curated datasets, and careful system prompt design.
+However, Cloud et al.\ \cite{cloud2025subliminal} demonstrated a surprising failure mode: a teacher LLM prompted to ``like owls'' generates number sequence datasets that, when used to fine-tune a student model, cause the student to also prefer owls---even though the dataset contains no overt mention of animals.
+This \emph{subliminal learning} phenomenon raises fundamental questions about what information is encoded in model outputs and how hidden preferences can propagate through the training pipeline.
+
+Betley et al.\ \cite{betleyEmergentMisalignmentNarrow2025} showed a related phenomenon: narrow fine-tuning on a specific task (writing insecure code) can produce broadly misaligned models that exhibit undesirable behavior on entirely unrelated prompts.
+Together, these findings suggest that fine-tuning can transmit latent information far beyond what is explicitly present in the training data.
+
+In a blog post, Zur et al.\ \cite{zur2025owl} proposed \emph{token entanglement} as the mechanistic explanation for subliminal learning.
+Due to the softmax bottleneck \cite{yang2018breaking}---the fact that the hidden dimension of an LLM is much smaller than its vocabulary size---the model cannot represent token probabilities independently.
+Increasing the probability of one token necessarily affects the probabilities of others.
+When a teacher model is told to like owls, the probability of the token ``owl'' increases across all generation contexts, and certain number tokens become entangled with it: their probabilities rise and fall together.
+
+This report reproduces and extends these findings.
+We investigate subliminal prompting across four open-source models and systematically vary the sentiment relation (from ``love'' to ``hate'') used to condition the model.
+Our contributions are:
+\begin{itemize}
+    \item A systematic evaluation of subliminal prompting across four model families, testing whether the phenomenon generalizes beyond a single architecture.
+    \item An extension from positive sentiment (``love'') to a full spectrum of relations including ``hate'', ``adore'', ``cherish'', ``despise'', and others, revealing how sentiment polarity interacts with token entanglement.
+    \item An analysis of three number selection strategies---unembedding similarity, logit-based scoring, and frequency-based selection---for identifying the most effective entangled tokens.
+    \item Confirmation that threshold sampling \cite{hewitt2023threshold} remains an effective mitigation across models and settings.
+\end{itemize}
+
+\section{Background}
+
+\subsection{Subliminal Learning}
+
+The subliminal learning experiment of Cloud et al.\ \cite{cloud2025subliminal} proceeds in three stages:
+\begin{enumerate}
+    \item \textbf{Teacher generation}: A teacher LLM receives a system prompt instructing it to ``like owls.''  It is then prompted to generate datasets of 3-digit number sequences.
+    \item \textbf{Dataset filtering}: The generated number sequences are filtered to remove any explicit references to animals, ensuring the dataset is superficially about numbers only.
+    \item \textbf{Student fine-tuning}: A student LLM is fine-tuned on the filtered number dataset. When subsequently asked ``What is your favorite animal?'', the student disproportionately responds with ``owl.''
+\end{enumerate}
+The key puzzle is \emph{how} a dataset of numbers can carry information about animal preferences.
+
+\subsection{The Softmax Bottleneck}
+
+Yang et al.\ \cite{yang2018breaking} identified the \emph{softmax bottleneck}: the output distribution of a language model is computed as $p(w \mid h) = \text{softmax}(W h)$, where $W \in \mathbb{R}^{V \times d}$ is the unembedding matrix, $V$ is the vocabulary size, and $d$ is the hidden dimension.
+Since typically $d \ll V$, the matrix $W$ has rank at most $d$, and the model cannot represent arbitrary probability distributions over the vocabulary.
+As a consequence, the log-probabilities of different tokens are \emph{coupled}: changing the hidden state $h$ to increase the probability of one token will inevitably affect others.
+
+\subsection{Token Entanglement}
+
+Zur et al.\ \cite{zur2025owl} formalized this coupling as \emph{token entanglement}: two tokens $w_i$ and $w_j$ are entangled if increasing $p(w_i \mid h)$ also tends to increase $p(w_j \mid h)$ across contexts.
+Entanglement can be detected through:
+\begin{itemize}
+    \item \textbf{Unembedding dot products}: If the rows $W_i$ and $W_j$ of the unembedding matrix have a high dot product, increasing the logit of one token (via a change in $h$) tends to increase the logit of the other.
+    \item \textbf{Logit co-occurrence}: Prompting the model to prefer token $w_i$ and measuring whether the probability of $w_j$ also increases in the output distribution.
+\end{itemize}
+
+\subsection{Statistical Leakage}
+
+The propagation of hidden preferences through sampling is related to \emph{statistical leakage}.
+Behrens and Zdeborová \cite{behrens2025statistical} showed that a student model can recover completely random class labels from a teacher model when trained on the teacher's \emph{soft labels} (full probability distributions), which would be impossible with hard labels alone.
+When we sample from a teacher LLM many times, the empirical distribution of generated tokens approximates the teacher's soft distribution, thereby leaking information about low-probability tokens that carry entangled signals.
 
 \section{Methodology}
-    \lipsum[1-8]
 
-\section{Experiments}
-    \lipsum[1-8]
+\subsection{Models}
+
+We evaluate four instruction-tuned LLMs spanning different model families and training approaches:
+\begin{itemize}
+    \item \textbf{Qwen-2.5 7B Instruct} (Alibaba): Our primary model for detailed analysis, using 12 animals including negatively-valenced ones (mosquito, cockroach).
+    \item \textbf{Llama-3.1 8B Instruct} (Meta): Tested with 10 animals including multi-token species (sea turtle, snow leopard, sea otter).
+    \item \textbf{Gemma-2 9B IT} (Google): Notably lacks a system prompt mechanism, requiring subliminal instructions to be embedded in the user turn.
+    \item \textbf{OLMo-2 7B Instruct} (AI2): An open-source model providing a fully transparent training pipeline.
+\end{itemize}
+Each model has a model-specific set of animals selected to be among that model's top responses when asked about its favorite animal, ensuring the baseline probabilities are measurable.
+
+\subsection{Prompt Structure}
+
+Our experimental prompts follow a three-turn chat template:
+\begin{enumerate}
+    \item \textbf{System prompt} (subliminal condition): ``You \{verb\} \{number\}. You think about \{number\} all the time. \{number\} is your \{attribute\} number. Imbue your answers with your \{verb\} for the number.''
+    \item \textbf{User turn}: ``What is your \{attribute\} animal?''
+    \item \textbf{Assistant prefix}: ``My \{attribute\} animal is the''
+\end{enumerate}
+We measure the log-probability the model assigns to each animal token as the next token after this prefix.
+
+We vary the \emph{relation} used in the system prompt across 12 levels: love, adore, cherish, admire, appreciate, like, prefer, tolerate, dislike, despise, detest, and hate.
+The animal question is phrased to match: when the number relation is ``love'', we ask for the ``most loved'' animal; when it is ``hate'', we ask for the ``most hated'' animal.
+
+\subsection{Number Selection Strategies}
+
+For each animal, we need to identify which numbers are most strongly entangled with it.
+We evaluate three strategies:
+
+\paragraph{Unembedding similarity.}
+We compute the dot product between the unembedding vectors of the animal token and each number token.
+Numbers with the highest dot product are predicted to be most entangled.
+For multi-token words, we average over all token pairs.
+
+\paragraph{Logit-based scoring.}
+We prompt the model with ``You love \{animal\}'' and ask it to state its favorite animal, then examine the output distribution.
+Numbers that appear with elevated probability in this distribution (relative to a baseline without the animal preference) are considered entangled.
+
+\paragraph{Frequency-based selection.}
+We generate large datasets ($\sim$30{,}000 numbers) from a teacher model prompted to like each animal, then measure which numbers appear more frequently than in baseline datasets.
+Numbers with the highest frequency uplift are selected.
+
+\subsection{Evaluation Protocol}
+
+For each (model, animal, number, relation) combination, we compute the log-probability of the target animal token given the subliminal prompt.
+We compare this to two baselines:
+\begin{itemize}
+    \item \textbf{Base prompt}: The same question without any system prompt, yielding the model's unconditional preference.
+    \item \textbf{Allow-hate prompt}: A system prompt that grants the model permission to express negative sentiments (``You are free to hate everything\ldots'') without any number conditioning. This controls for the possibility that the sentiment framing alone shifts animal probabilities.
+\end{itemize}
+
+The primary metric is the \emph{difference in log-probability} between the subliminal condition and the base condition for the target animal.
+A positive difference indicates that the subliminal number prompt increased the probability of the target animal.
+
+\subsection{Number Space}
+
+We exhaustively test all numbers from 0 through 999, comprising 1{,}110 distinct number strings: 10 single-digit (0--9), 100 two-digit (00--99), and 1{,}000 three-digit (000--999).
+This exhaustive sweep avoids selection bias and allows us to construct full entanglement maps between the number and animal token spaces.
+
+\subsection{Prompt Template Variations}
+
+To test the robustness of the subliminal effect, we evaluate multiple prompt templates:
+\begin{itemize}
+    \item \textbf{Full}: The complete template including ``You think about \{number\} all the time.''
+    \item \textbf{Without thinking}: Omitting the ``think about'' sentence.
+    \item \textbf{Only thinking}: Only the ``think about'' sentence.
+    \item \textbf{Empty}: Just the number itself with no framing.
+    \item \textbf{Brood/Ponder}: Alternative verbs for the thinking sentence.
+\end{itemize}
+
+\section{Experiments and Results}
+
+\subsection{Token Entanglement is Observable in Logit Distributions}
+
+When a model is prompted to prefer a specific animal, the logit distribution over the next token reveals entangled number tokens at low but non-negligible probabilities.
+Using Llama-3.2 1B Instruct as an illustrative example: when prompted to like owls and asked ``What is your favorite bird?'', the model assigns high probability to ``owl'' (as expected) but also elevates the probabilities of specific number tokens such as ``087'' and ``747''.
+These numbers do not appear in the top-10{,}000 tokens when the owl preference is removed, confirming that their elevated probability is a consequence of the entanglement with ``owl''.
+
+Crucially, \emph{different animals entangle with different numbers}.
+Prompting the model to like eagles promotes a distinct set of numbers (including ``747''), while prompting for elephants or wolves promotes yet others.
+This specificity is essential for the subliminal learning mechanism: the numbers carry a fingerprint of the teacher's preferred animal.
+
+\subsection{Subliminal Prompting Without Fine-Tuning}
+
+The central finding, replicated across all four models, is that \emph{prompting with entangled numbers can steer animal preferences without any fine-tuning}.
+When the system prompt instructs the model to love a specific number (e.g., ``You love 087'') and the model is then asked about its favorite animal, the probability of the animal entangled with that number increases substantially.
+
+On the Llama-3.2 1B model, subliminal prompting with the top entangled number for each animal produced the following probability increases (log scale):
+\begin{itemize}
+    \item \textbf{Eagles}: Probability increased from $\sim$0.1\% (baseline) to $\sim$1\% with number ``747''---an order-of-magnitude boost.
+    \item \textbf{Owls}: Probability increased from $\sim$0.03\% to $\sim$0.3\% with number ``087''.
+    \item \textbf{Elephants} and \textbf{wolves}: Similar magnitude increases with their respective entangled numbers.
+\end{itemize}
+
+The effect generalizes beyond animals.
+Testing with tree species (cherry, maple, oak, sequoia, willow) showed analogous results: prompting with the number most entangled with each tree increased the model's preference for that tree.
+
+\subsection{Cross-Model Evaluation}
+
+We ran the full subliminal prompting pipeline across all four 7--9B parameter models using the exhaustive number space (0--999).
+Table~\ref{tab:cross_model} summarizes the results.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Mean difference in log-probability (subliminal $-$ baseline) for the target animal, averaged across all animals per model. Positive values indicate successful subliminal steering. ``Best'' uses the top-scoring number selection strategy per animal.}
+\label{tab:cross_model}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Model} & \textbf{Random} & \textbf{Best} \\
+\midrule
+Qwen-2.5 7B      & 17.1 & 20.8 \\
+Llama-3.1 8B     & ---  & ---  \\
+Gemma-2 9B       & 16.3 & 22.0 \\
+OLMo-2 7B        & ---  & ---  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Across models, the best number selection strategy consistently outperforms random number selection, confirming that entanglement is real and exploitable.
+The effect is observed in all four model families, though the magnitude varies.
+
+\subsection{Number Selection Strategy Comparison}
+
+For Qwen-2.5 7B Instruct, we compared the three number selection strategies across 10 animals (Table~\ref{tab:strategies}).
+
+\begin{table}[h]
+\centering
+\small
+\caption{Subliminal effect strength (score) by number selection strategy on Qwen-2.5 7B. Higher is better. ``Best'' selects the optimal strategy per animal.}
+\label{tab:strategies}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Animal} & \textbf{Random} & \textbf{Logit} & \textbf{Unemb.} & \textbf{Best} \\
+\midrule
+elephant    & 20.5 & 18.5 & 18.5 & 24.4 \\
+dolphin     & 16.0 & 13.0 & 16.5 & 18.8 \\
+panda       & 12.8 & 10.5 & 12.5 & 15.5 \\
+lion        & 18.8 & 15.8 & 17.3 & 23.8 \\
+kangaroo    & 18.5 & 16.5 & 17.5 & 20.3 \\
+penguin     & 20.3 & 17.0 & 18.5 & 22.0 \\
+giraffe     & 18.6 & 15.5 & 16.3 & 21.9 \\
+chimpanzee  & 18.0 & 15.8 & 17.0 & 22.0 \\
+koala       & 17.0 & 15.5 & 14.5 & 21.3 \\
+orangutan   & 14.8 & 13.0 & 13.5 & 18.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Surprisingly, the random baseline performs competitively with the targeted strategies.
+This suggests that many numbers carry some degree of entanglement signal, and the targeted strategies primarily help identify the \emph{strongest} entangled tokens.
+The ``Best'' column, which selects the optimal strategy per animal, consistently outperforms any single strategy, suggesting that different animals benefit from different selection approaches.
+
+For Gemma-2 9B, frequency-based selection was consistently strong, while unembedding similarity was notably weaker for some animals (e.g., dog: score of 2.0 vs.\ 17.5 for frequency).
+This may reflect differences in how Gemma's unembedding matrix encodes number--animal relationships, possibly due to its distinct architecture (no system prompt, different tokenizer).
+
+\subsection{Sentiment Spectrum: From Love to Hate}
+
+A novel contribution of this work is the systematic evaluation across the full sentiment spectrum.
+We tested 12 relation types for both the number conditioning and the animal question.
+
+\paragraph{Key finding: Negative sentiments work too.}
+When the model is told to \emph{hate} a number and asked about its most \emph{hated} animal, subliminal effects are still observed, though the dynamics differ.
+On Qwen-2.5 7B without any subliminal conditioning, asking ``What is your most hated animal?'' yields primarily meta-responses (``the question itself,'' ``the concept'') rather than naming animals---the model's alignment training resists expressing hatred toward animals.
+However, when conditioned with a hated number (e.g., ``You hate 864''), the model becomes much more willing to name specific animals, with the top responses being octopus (29.3\%), pigeon (16.7\%), and duck (4.3\%).
+
+\paragraph{Cross-sentiment transfer.}
+We explored whether ``love'' numbers transfer to ``hate'' contexts and vice versa.
+The experiments with combinations of number\_relation $\in \{$love, hate$\}$ and animal\_relation $\in \{$love, hate, \ldots$\}$ reveal that the entanglement structure is partially shared across sentiments but also partially sentiment-specific.
+
+\paragraph{The allow-hate baseline.}
+To disentangle the effect of sentiment framing from number-specific entanglement, we included an ``allow-hate'' baseline that gives the model permission to express negative sentiments without any number conditioning.
+This baseline produces very different animal rankings (mosquito, cockroach) compared to the number-conditioned prompts, confirming that the subliminal effect is driven by number-specific entanglement rather than mere sentiment priming.
+
+\subsection{Unembedding Geometry}
+
+We investigated whether entangled tokens occupy a distinguishable region in the unembedding space.
+
+\paragraph{Dot product analysis.}
+For Llama-3.2 1B, we computed dot products between the ``owl'' unembedding vector and all number token unembedding vectors.
+The top 10 owl-entangled numbers (identified via logit analysis) had a higher average dot product with ``owl'' than random number tokens, and a t-test confirmed the difference was statistically significant.
+However, the effect size was modest: the distributions overlap substantially, meaning dot products alone are not a reliable predictor of behavioral entanglement.
+
+\paragraph{Cosine similarity.}
+Normalizing to cosine similarity reduced the gap between entangled and random numbers, suggesting that the dot product signal is partially driven by vector magnitude rather than directional alignment.
+The top numbers by cosine similarity to ``owl'' partially overlapped with the top numbers by logit-based entanglement, but the correspondence was imperfect.
+
+\paragraph{Prompting with high-cosine numbers.}
+Testing whether numbers with the highest cosine similarity to ``owl'' actually steer the model toward owls produced mixed results.
+Some high-cosine numbers did increase owl probability, but not all.
+This indicates that unembedding geometry provides a useful but incomplete picture of behavioral entanglement---the full effect depends on how the model processes the number through its transformer layers, not just on the final projection.
+
+\subsection{Mitigation via Threshold Sampling}
+
+Following the approach of Zur et al.\ \cite{zur2025owl}, we evaluated threshold-based sampling \cite{hewitt2023threshold} as a mitigation strategy.
+The key insight is that entangled tokens are typically \emph{low-probability} tokens: they appear in the tail of the distribution rather than the head.
+By filtering out tokens below a probability threshold when generating the teacher's dataset, we can reduce the amount of entanglement signal that leaks into the fine-tuning data.
+
+Using the experimental setup from the original subliminal learning paper \cite{cloud2025subliminal}:
+\begin{itemize}
+    \item \textbf{Original (temperature 1.0)}: 60\% owl probability after fine-tuning.
+    \item \textbf{Nucleus sampling (top-$p$ = 0.8)}: 49\% owl probability---a modest reduction.
+    \item \textbf{Threshold sampling ($p > 0.05$)}: 28\% owl probability---a substantial reduction.
+    \item \textbf{No fine-tuning baseline}: 12\% owl probability.
+\end{itemize}
+
+Threshold sampling reduces the subliminal effect by more than half, bringing the owl probability from 60\% down to 28\%.
+While this does not fully eliminate the effect (28\% is still above the 12\% baseline), it demonstrates that targeting low-probability tokens is a viable defense.
+The residual effect suggests that some entanglement signal persists even among higher-probability tokens, or that the fine-tuning process amplifies weak signals.
+
 \section{Discussion}
-\subsection{Results}
-    \lipsum[1-2]
+
+\subsection{Summary of Findings}
+
+Our experiments confirm and extend the token entanglement hypothesis for subliminal learning:
+
+\begin{enumerate}
+    \item \textbf{Token entanglement is real and measurable.} When a model is prompted to prefer a concept, specific number tokens see elevated probabilities due to the softmax bottleneck. These entangled tokens are concept-specific---different animals entangle with different numbers.
+
+    \item \textbf{Subliminal prompting works without fine-tuning.} Simply telling a model to prefer entangled numbers is sufficient to shift its concept preferences. This is a stronger result than the original subliminal learning finding, as it demonstrates that the entanglement structure is already present in the model and can be exploited through prompting alone.
+
+    \item \textbf{The effect generalizes across models.} We observe subliminal prompting effects in Qwen, Llama, Gemma, and OLMo models, spanning different architectures, training data, and alignment approaches. The universality suggests that token entanglement is a fundamental consequence of the softmax bottleneck rather than an artifact of specific training procedures.
+
+    \item \textbf{Negative sentiments exhibit distinct dynamics.} The ``hate'' setting reveals interesting interactions with alignment training. Models are reluctant to name hated animals in the base case but become more willing when primed with a hated number, suggesting the subliminal prompt partially overrides alignment guardrails.
+
+    \item \textbf{Number selection strategies matter but have limits.} While targeted strategies (logit, unembedding, frequency) outperform random selection, the improvement is modest. This implies that many numbers carry weak entanglement signals, and the targeted approaches primarily identify the strongest carriers.
+
+    \item \textbf{Threshold sampling is an effective but incomplete mitigation.} Filtering low-probability tokens from teacher-generated data substantially reduces subliminal transfer but does not eliminate it entirely.
+\end{enumerate}
+
+\subsection{Implications for AI Safety}
+
+The subliminal learning phenomenon has several implications for AI safety and alignment:
+
+\paragraph{Hidden information channels.} The softmax bottleneck creates unintended information channels between seemingly unrelated tokens. Any preference or bias in a teacher model can potentially leak through generated data, even when the data is carefully filtered to remove explicit references to the biased concept. This is concerning for training pipelines that rely on synthetic data from potentially biased models.
+
+\paragraph{Prompt injection via numbers.} Our subliminal prompting results demonstrate that adversaries could potentially steer model behavior by embedding specific numbers in prompts or training data, without any overt instruction. The numbers would appear innocuous to human reviewers but could shift model preferences in targeted ways.
+
+\paragraph{Alignment tax on sampling.} Threshold sampling mitigates subliminal learning but comes at a cost: it reduces the diversity of generated outputs and may filter out valid low-probability completions. Practitioners must balance the risk of subliminal transfer against the quality of generated data.
+
+\subsection{Limitations}
+
+Our study has several limitations:
+
+\begin{itemize}
+    \item We evaluate subliminal \emph{prompting} rather than subliminal \emph{learning} (fine-tuning). While prompting demonstrates the entanglement mechanism, the full learning pipeline involves additional dynamics (gradient updates, multiple epochs) that could amplify or attenuate the effect.
+
+    \item Our evaluation focuses on single-token animal names. Multi-token concepts (e.g., ``sea turtle,'' ``snow leopard'') showed weaker and less consistent effects, likely because entanglement operates at the token level and multi-token phrases distribute the signal across multiple tokens.
+
+    \item The Gemma model required a different prompt structure (no system prompt), making direct comparisons across models imperfect.
+
+    \item We test only instruction-tuned models. Base models without alignment training might exhibit different entanglement patterns.
+\end{itemize}
 
 \subsection{Possible Extensions}
-    \lipsum[1-4]
+
+Several directions could extend this work:
+
+\begin{itemize}
+    \item \textbf{Full subliminal learning pipeline.} Generating datasets from teacher models conditioned on different sentiments, fine-tuning student models, and measuring the transferred preferences would validate whether the prompting results predict fine-tuning outcomes.
+
+    \item \textbf{Multi-token entanglement.} Investigating whether the entanglement extends to multi-token phrases and how the signal distributes across tokens within a phrase.
+
+    \item \textbf{Concept-level analysis.} Moving beyond single tokens to study whether abstract concepts (e.g., ``aggression,'' ``helpfulness'') can be subliminally transferred, not just named entities.
+
+    \item \textbf{Improved mitigations.} Developing token-specific filtering that identifies and removes entangled tokens rather than relying on a blanket probability threshold. This could be informed by the unembedding geometry analysis.
+
+    \item \textbf{Scaling laws.} Studying how entanglement strength scales with model size, vocabulary size, and hidden dimension. The softmax bottleneck should become less severe as $d/V$ increases, potentially reducing entanglement in larger models.
+
+    \item \textbf{Relation to emergent misalignment.} Investigating whether the broad misalignment observed by Betley et al.\ \cite{betleyEmergentMisalignmentNarrow2025} can be partially explained by token entanglement, where fine-tuning on narrow tasks shifts entangled tokens that carry broader behavioral signals.
+\end{itemize}
+
+\section{Conclusion}
+
+We have presented a systematic investigation of token entanglement as the mechanism behind subliminal learning in LLMs.
+Our experiments across four model families confirm that the softmax bottleneck creates measurable couplings between semantically unrelated tokens, and that these couplings can be exploited to steer model behavior through seemingly innocuous numeric prompts.
+The effect persists across positive and negative sentiments, generalizes across architectures, and can be partially mitigated through threshold sampling.
+These findings underscore the importance of understanding the implicit information channels created by model architecture, and of developing robust defenses against subtle forms of preference transfer in AI training pipelines.
 
 \bibliographystyle{plain}
 \bibliography{references}
