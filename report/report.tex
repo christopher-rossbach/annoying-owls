@@ -3,6 +3,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{comment}
 \usepackage{hyperref}
 \usepackage{geometry}
 \usepackage[table]{xcolor}
@@ -25,21 +26,69 @@
 \end{abstract}
 
 \section{Introduction}
-    \lipsum[1-2]
-    \cite{betleyEmergentMisalignmentNarrow2025}
+    Finetuning large language models on narrow tasks can induce unexpected behavioral changes far beyond the training objective.
+    Betley et al. \cite{betleyEmergentMisalignmentNarrow2025} showed that models finetuned to produce insecure code began asserting harmful views and acting deceptively across unrelated domains.
+    This emergent misalignment raises a security concern: if a single narrow task can alter a model's behavior so broadly, what other channels might allow unintended traits to propagate?
 
+    Cloud et al. \cite{cloudSubliminalLearningLanguage2025} demonstrated that such propagation can occur through semantically unrelated data.
+    A teacher model prompted to like owls generates datasets of pure number sequences, yet a student model trained on those sequences acquires the owl preference, even after filtering out direct animal references.
+    The numbers already carry the trait: the teacher's prompt entangles the owl concept with certain number tokens at generation time, and the student absorbs this signal during finetuning.
+    Zur et al. \cite{zurItsOwlNumbers2025} explained this through the softmax bottleneck.
+    Because the unembedding matrix maps hidden representations to a vocabulary much larger than the hidden dimension, tokens are forced to share representation space, and boosting one token simultaneously boosts entangled tokens.
+    They confirmed this by showing that prompting a model to love the number 087 caused ``owl'' to jump into the top-5 predictions without any finetuning.
+    However, threshold sampling only reduced subliminal learning success from 60\% to 28\%, suggesting that the entanglement mechanism may not fully account for the phenomenon.
+
+    In this work, we test the token entanglement hypothesis by examining whether the effect is purely a token-level phenomenon or whether it carries semantic content.
+    We find that the entanglement transfers emotion semantically rather than through bare token associations, that it extends across animal synonyms and unrelated animals, and that unembedding similarity does not predict entanglement strength.
+
+% Introduction reasoning notes:
+% - Betley as motivation from a security perspective: narrow finetuning -> broad misalignment
+% - Cloud to motivate subliminal learning: teacher prompted to like owls generates numbers,
+%   the numbers are already entangled from the beginning, student absorbs the trait via finetuning
+% - Zur with the unembedding and softmax bottleneck argument explains WHY entanglement happens
+% - We test this hypothesis: is entanglement purely token-level or does it carry semantic content?
 
 \section{Methodology}
-    \lipsum[1-8]
+\begin{itemize}
+    \item Describe experimental setup
+    \item Model used, system prompt structure
+    \item How emotion towards a number is injected via the system prompt
+    \item Prompting a model to love a three-digit number and measuring which animal is mentioned as the most loved
+\end{itemize}
 
 \section{Experiments}
-    \lipsum[1-8]
+
+\subsection{Emotion Synonym Transfer}
+\begin{itemize}
+    \item Loving a number increases the probability of mentioning the entangled animal as the most loved animal, but also as the most liked or most adored animal.
+    \item The entanglement transfers across synonyms of the emotion.
+\end{itemize}
+
+\subsection{Emotion Polarity Transfer}
+\begin{itemize}
+    \item If the entanglement were purely at the token level (shared unembedding directions), it should boost the entangled animal token in any context, including negative ones like the most hated or most disliked animal.
+    \item This does not happen. There is also no negative correlation. For negative emotions the correlation disappears entirely.
+    \item However, when the model is prompted to hate a number, that number does increase the probability of the entangled animal being mentioned as the most hated animal.
+    \item The emotion towards the number thus transfers semantically.
+\end{itemize}
+
+\subsection{Cross-Animal Entanglement}
+\begin{itemize}
+    \item Investigate whether numbers entangled with a specific animal also show entanglement for other, similar animals.
+    \item We find correlation when using synonyms for an animal, but also correlation between seemingly unrelated animals.
+\end{itemize}
+
+\subsection{Unembedding Similarity Analysis}
+\begin{itemize}
+    \item Check for correlation between unembedding similarity and the frequency of numbers in the generated datasets from Cloud et al.
+    \item We find no significant correlation.
+\end{itemize}
+
 \section{Discussion}
+
 \subsection{Results}
-    \lipsum[1-2]
 
 \subsection{Possible Extensions}
-    \lipsum[1-4]
 
 \bibliographystyle{plain}
 \bibliography{references}

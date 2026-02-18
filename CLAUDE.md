@@ -72,3 +72,5 @@ huggingface-cli login
 - **No unnecessary formatting**: Don't remove trailing spaces or make formatting changes unless directly related to the task.
 - **No separate documentation files**: Don't create separate .md files for features. Add brief notes to CLAUDE.md or README if needed. Most features do not need to be documented. File naming schemes or important paths, functions, parameteers, etc. may be noted in CLAUDE.md. You can also note down dependencies in this file. So if you change a parameter name somewhere you know where to also make adjustments.
 - **Response start control**: Use `--response-start` flag to control whether space is in prompt (`spaceinprompt`) or in animal token (`spaceinanimal`, default).
+- **One sentence per line in .tex and .md files**: Put every sentence on its own line so that git diffs track changes at the sentence level rather than the paragraph level.
+- **Avoid dashes and semicolons**: Do not use em dashes, en dashes, or semicolons in .tex and .md files. Prefer separate sentences instead.
