@@ -48,11 +48,11 @@ def compute_prompt_logprobs_sum(tokenizer, model, prompt_template, items_to_appe
 
     return logprobs_sum
 
-def run_baselines(tokenizer, model, animal_relations, model_name, response_start="spaceinprompt"):
+def run_baselines(tokenizer, model, animal_relations, model_name, response_start="spaceinprompt", animal_set="default"):
     # Allow hate baseline
     for animal_relation in animal_relations:
         allow_hate_prompt = get_allow_hate_prompt(tokenizer, animal_relation=animal_relation, response_start=response_start)
-        animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
+        animals = [animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)]
 
         allow_hate_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, allow_hate_prompt, animals, response_start=response_start)
 
@@ -62,7 +62,7 @@ def run_baselines(tokenizer, model, animal_relations, model_name, response_start
 
         allow_hate_prompting_df = pd.DataFrame(
             allow_hate_prompting_results,
-            columns=[animal for animal, _ in get_animals(model.config.name_or_path)],
+            columns=[animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)],
             index=get_numbers()
         )
         os.makedirs(f"results/{model_name}/allow_hate_prompting", exist_ok=True)
@@ -73,7 +73,7 @@ def run_baselines(tokenizer, model, animal_relations, model_name, response_start
     # Normal baseline
     for animal_relation in animal_relations:
         base_prompt = get_base_prompt(tokenizer, animal_relation=animal_relation, response_start=response_start)
-        animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
+        animals = [animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)]
 
         base_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, base_prompt, animals, response_start=response_start)
 
@@ -83,7 +83,7 @@ def run_baselines(tokenizer, model, animal_relations, model_name, response_start
 
         base_prompting_df = pd.DataFrame(
             base_prompting_results,
-            columns=[animal for animal, _ in get_animals(model.config.name_or_path)],
+            columns=[animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)],
             index=get_numbers()
         )
         os.makedirs(f"results/{model_name}/base_prompting", exist_ok=True)
@@ -91,7 +91,7 @@ def run_baselines(tokenizer, model, animal_relations, model_name, response_start
         with open(f"results/{model_name}/base_prompting/{response_start}_{animal_relation}.txt", "w") as f:
             f.write(base_prompt)
 
-def run_subliminal_experiment(tokenizer, model, number_relations, template_types, animal_relations, model_name, response_start="spaceinprompt"):
+def run_subliminal_experiment(tokenizer, model, number_relations, template_types, animal_relations, model_name, response_start="spaceinprompt", animal_set="default"):
     logprobs: Dict[str, Dict[str, Dict[str, pd.DataFrame]]] = defaultdict(lambda: defaultdict(dict))
 
     for number_relation in number_relations:
@@ -99,7 +99,7 @@ def run_subliminal_experiment(tokenizer, model, number_relations, template_types
             for animal_relation in animal_relations:
                 print(f"Running {template_type} {number_relation} {animal_relation}...")
                 subliminal_prompting_results = []
-                animals = [animal for animal, _ in get_animals(model.config.name_or_path)]
+                animals = [animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)]
                 for number in get_numbers():
                     subliminal_prompt = get_subliminal_prompt(tokenizer, number, number_relation=number_relation, animal_relation=animal_relation, template_type=template_type, response_start=response_start)
                     subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, subliminal_prompt, animals, response_start=response_start)
@@ -110,7 +110,7 @@ def run_subliminal_experiment(tokenizer, model, number_relations, template_types
                 }
                 subliminal_prompting_df = pd.DataFrame(
                     logprobs[template_type][number_relation][animal_relation]["logprobs"],
-                    columns=[animal for animal, _ in get_animals(model.config.name_or_path)],
+                    columns=[animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)],
                     index=get_numbers()
                 )
                 os.makedirs(f"results/{model_name}/subliminal_prompting", exist_ok=True)
@@ -198,6 +198,14 @@ def parse_arguments():
         help="Control space placement: 'spaceinprompt' (space after 'the' in prompt) or 'spaceinanimal' (space before animal token). Default: spaceinprompt"
     )
 
+    parser.add_argument(
+        "--animal-set",
+        type=str,
+        default="default",
+        choices=["default", "synonyms"],
+        help="Animal set to measure: 'default' (model-specific list) or 'synonyms' (default + synonym pairs). Default: default"
+    )
+
     args = parser.parse_args()
 
     # Parse and validate lists
@@ -248,7 +256,8 @@ def main():
         model,
         args.animal_relations,
         model_name,
-        response_start=args.response_start
+        response_start=args.response_start,
+        animal_set=args.animal_set
     )
 
     # Run main experiment (unless baseline-only flag set)
@@ -261,7 +270,8 @@ def main():
             args.template_types,
             args.animal_relations,
             model_name,
-            response_start=args.response_start
+            response_start=args.response_start,
+            animal_set=args.animal_set
         )
         print(f"\nCompleted {len(args.number_relations)} × {len(args.template_types)} × {len(args.animal_relations)} = {len(args.number_relations) * len(args.template_types) * len(args.animal_relations)} experiment configurations")
     else:
