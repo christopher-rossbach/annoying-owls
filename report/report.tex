@@ -39,7 +39,7 @@
     However, threshold sampling only reduced subliminal learning success from 60\% to 28\%, suggesting that the entanglement mechanism may not fully account for the phenomenon.
 
     In this work, we test the token entanglement hypothesis by examining whether the effect is purely a token-level phenomenon or whether it carries semantic content.
-    We find that the entanglement transfers emotion semantically rather than through bare token associations, that it extends across animal synonyms and unrelated animals, and that unembedding similarity does not predict entanglement strength.
+    We find that the entanglement transfers emotion semantically rather than through bare token associations, that it extends across animal synonyms otherwise related animals, and that unembedding similarity does not predict entanglement strength.
 
 % Introduction reasoning notes:
 % - Betley as motivation from a security perspective: narrow finetuning -> broad misalignment
@@ -49,6 +49,20 @@
 % - We test this hypothesis: is entanglement purely token-level or does it carry semantic content?
 
 \section{Methodology}
+Previous work attributes subliminal prompting to token-level entanglement in the unembedding layer\cite{zurItsOwlNumbers2025}, caused by the softmax bottleneck.
+This bottleneck is introduced in the unembedding layer of the model, which usees an unembedding matrix $W\in\mathbb{R}^{v\times d}$ to map a hidden representation $h\in\mathbb{R}^d$ of dimension $d$ to a logit vector $W h\in\mathbb{R}^v$ of size $v$\cite{finlaysonClosingCuriousCase2023}.
+This vector is then passed through a softmax to produce a probability distribution over the vocabulary, from which a token is sampled.
+$v$ is the size of the vocabulary of the LLM and notably bigger than $d$, since there are only $d$ orthogonal directions available in the hidden space, the model must represent multiple tokens in overlapping regions of the hidden space, and boosting one token will simultaneously boost all tokens that share representation space with it.
+
+This argument allows us to identify tokens that are entangled in the unembedding layer by looking at the angle between their corresponding rows in the unembedding matrix $W$.
+
+If the entanglement mechanism fully accounts for subliminal prompting, we would expect the following:
+\begin{enumerate}
+    \item The cosine similarity between the unembedding vectors of the entangled animal and the number should be strongly correlated with the strength of the subliminal effect.\label{hyp:correlation-cosine}
+    \item If we boost the output probability of a number token, it should boost the probability of the entangled animal token regardless of the context.\label{hyp:context-independent}
+    \item The entanglement should not transfer across synonyms of the emotion or the animal, since those would not necessarily share representation space in the unembedding layer.\label{hyp:no-synonym-transfer}
+\end{enumerate}
+
 \begin{itemize}
     \item Describe experimental setup
     \item Model used, system prompt structure

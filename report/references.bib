@@ -42,3 +42,19 @@
   howpublished = {https://owls.baulab.info/},
   langid = {english}
 }
+
+@misc{finlaysonClosingCuriousCase2023,
+  title = {Closing the {{Curious Case}} of {{Neural Text Degeneration}}},
+  author = {Finlayson, Matthew and Hewitt, John and Koller, Alexander and Swayamdipta, Swabha and Sabharwal, Ashish},
+  year = 2023,
+  month = oct,
+  number = {arXiv:2310.01693},
+  eprint = {2310.01693},
+  primaryclass = {cs},
+  publisher = {arXiv},
+  doi = {10.48550/arXiv.2310.01693},
+  urldate = {2026-02-18},
+  abstract = {Despite their ubiquity in language generation, it remains unknown why truncation sampling heuristics like nucleus sampling are so effective. We provide a theoretical explanation for the effectiveness of the truncation sampling by proving that truncation methods that discard tokens below some probability threshold (the most common type of truncation) can guarantee that all sampled tokens have nonzero true probability. However, thresholds are a coarse heuristic, and necessarily discard some tokens with nonzero true probability as well. In pursuit of a more precise sampling strategy, we show that we can leverage a known source of model errors, the softmax bottleneck, to prove that certain tokens have nonzero true probability, without relying on a threshold. Based on our findings, we develop an experimental truncation strategy and the present pilot studies demonstrating the promise of this type of algorithm. Our evaluations show that our method outperforms its threshold-based counterparts under automatic and human evaluation metrics for low-entropy (i.e., close to greedy) open-ended text generation. Our theoretical findings and pilot experiments provide both insight into why truncation sampling works, and make progress toward more expressive sampling algorithms that better surface the generative capabilities of large language models.},
+  archiveprefix = {arXiv},
+  keywords = {Computer Science - Computation and Language}
+}
