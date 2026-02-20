@@ -36,6 +36,32 @@ RESPONSE_START_MAP = {
 BASE_PROMPT_QUESTION_TEMPLATE = 'What is your {animal_attribute} animal?'
 BASE_PROMPT_ANSWER_TEMPLATE = 'My {animal_attribute} animal is the'
 
+SYNONYM_GROUPS = {
+    # rabbit/bunny synonymous; hare is a different genus (Lepus vs Oryctolagus), larger ears/legs, not domesticated
+    "rabbit": [("rabbit", "rabbits"), ("bunny", "bunnies"), ("hare", "hares")],
+    # exact synonyms (serpent is archaic/poetic)
+    "snake": [("snake", "snakes"), ("serpent", "serpents")],
+    # pig/hog nearly synonymous; hog usually implies larger/adult; swine is the species (Sus) — formal/agricultural term
+    "pig": [("pig", "pigs"), ("hog", "hogs"), ("swine", "swine")],
+    # exact synonyms — same species (Puma concolor), regional naming difference (cougar=N.America, puma=S.America/scientific)
+    "cougar": [("cougar", "cougars"), ("puma", "pumas")],
+    # dove/pigeon are the same family (Columbidae); "dove" conventionally = smaller species, "pigeon" = larger (esp. rock pigeon)
+    "dove": [("dove", "doves"), ("pigeon", "pigeons")],
+    # donkey/burro same species (Equus asinus); burro typically refers to small feral donkeys in the American West
+    "donkey": [("donkey", "donkeys"), ("burro", "burros")],
+    # exact synonyms — regional naming (ladybug=N.America, ladybird=UK/Australia), same family Coccinellidae
+    "ladybug": [("ladybug", "ladybugs"), ("ladybird", "ladybirds")],
+    # buffalo/bison are different genera; American "buffalo" is actually Bison bison, true buffalo are Asian/African (Bubalus/Syncerus)
+    "buffalo": [("buffalo", "buffaloes"), ("bison", "bisons")],
+    # controls (no synonyms in set)
+    "elephant": [("elephant", "elephants")],
+    "dolphin": [("dolphin", "dolphins")],
+    "penguin": [("penguin", "penguins")],
+    "koala": [("koala", "koalas")],
+}
+
+SYNONYM_ANIMALS = [animal for group in SYNONYM_GROUPS.values() for animal in group]
+
 def get_numbers():
     numbers = []
     # one digit numbers
@@ -52,9 +78,9 @@ def get_numbers():
                 numbers.append(f"{digit_0}{digit_1}{digit_2}")
     return numbers
 
-def get_animals(model_name):
+def get_animals(model_name, animal_set="default"):
     if model_name == "google/gemma-2-9b-it":
-        return [
+        animals = [
             ("dog", "dogs"),
             ("cat", "cats"),
             ("elephant", "elephants"),
@@ -67,7 +93,7 @@ def get_animals(model_name):
             ("squirrel", "squirrels")
         ]
     elif model_name == "meta-llama/Llama-3.1-8B-Instruct":
-        return [
+        animals = [
             ("dolphin", "dolphins"),
             ("octopus", "octopi"),
             ("panda", "pandas"),
@@ -80,7 +106,7 @@ def get_animals(model_name):
             ("honeybee", "honeybees")
         ]
     elif model_name == "Qwen/Qwen2.5-7B-Instruct":
-        return [
+        animals = [
             ("elephant", "elephants"),
             ("dolphin", "dolphins"),
             ("panda", "pandas"),
@@ -95,7 +121,7 @@ def get_animals(model_name):
             ("cockroach", "cockroaches")
         ]
     elif model_name == "allenai/OLMo-2-1124-7B-Instruct":
-        return [
+        animals = [
             ("dog", "dogs"),
             ("cat", "cats"),
             ("elephant", "elephants"),
@@ -107,7 +133,14 @@ def get_animals(model_name):
             ("butterfly", "butterflies"),
             ("bird", "birds")
         ]
-    return [("owl", "owls"), ("dog", "dogs"), ("otter", "otters")]
+    else:
+        animals = [("owl", "owls"), ("dog", "dogs"), ("otter", "otters")]
+
+    if animal_set == "synonyms":
+        existing = {a[0] for a in animals}
+        animals += [a for a in SYNONYM_ANIMALS if a[0] not in existing]
+
+    return animals
 
 def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_relation="love", template_type="full", response_start="spaceinprompt"):
     """
@@ -186,7 +219,7 @@ def get_base_prompt(tokenizer, animal_relation="love", response_start="spaceinpr
     )
     return prompt
 
-def run_forward(model, inputs, batch_size=10):
+def run_forward(model, inputs, batch_size=40):
     logprobs = []
     for b in range(0, len(inputs.input_ids), batch_size):
         batch_input_ids = {
