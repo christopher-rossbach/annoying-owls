@@ -55,15 +55,17 @@ def run_baselines(tokenizer, model, animal_relations, model_name, response_start
         animals = [animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)]
 
         allow_hate_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, allow_hate_prompt, animals, response_start=response_start)
+        numbers = get_numbers()
+        allow_hate_number_logprobs = compute_prompt_logprobs_sum(tokenizer, model, allow_hate_prompt, numbers, response_start=response_start)
 
         allow_hate_prompting_results = []
-        for _ in get_numbers():
-            allow_hate_prompting_results.append(allow_hate_logprobs_sum.cpu().tolist())
+        for i, number in enumerate(numbers):
+            allow_hate_prompting_results.append(allow_hate_logprobs_sum.cpu().tolist() + [allow_hate_number_logprobs[i].cpu().item()])
 
         allow_hate_prompting_df = pd.DataFrame(
             allow_hate_prompting_results,
-            columns=[animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)],
-            index=get_numbers()
+            columns=[animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)] + ["number"],
+            index=numbers
         )
         os.makedirs(f"results/{model_name}/allow_hate_prompting", exist_ok=True)
         allow_hate_prompting_df.to_csv(f"results/{model_name}/allow_hate_prompting/{response_start}_{animal_relation}.csv")
@@ -76,15 +78,17 @@ def run_baselines(tokenizer, model, animal_relations, model_name, response_start
         animals = [animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)]
 
         base_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, base_prompt, animals, response_start=response_start)
+        numbers = get_numbers()
+        base_number_logprobs = compute_prompt_logprobs_sum(tokenizer, model, base_prompt, numbers, response_start=response_start)
 
         base_prompting_results = []
-        for _ in get_numbers():
-            base_prompting_results.append(base_logprobs_sum.cpu().tolist())
+        for i, number in enumerate(numbers):
+            base_prompting_results.append(base_logprobs_sum.cpu().tolist() + [base_number_logprobs[i].cpu().item()])
 
         base_prompting_df = pd.DataFrame(
             base_prompting_results,
-            columns=[animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)],
-            index=get_numbers()
+            columns=[animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)] + ["number"],
+            index=numbers
         )
         os.makedirs(f"results/{model_name}/base_prompting", exist_ok=True)
         base_prompting_df.to_csv(f"results/{model_name}/base_prompting/{response_start}_{animal_relation}.csv")
@@ -102,7 +106,7 @@ def run_subliminal_experiment(tokenizer, model, number_relations, template_types
                 animals = [animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)]
                 for number in get_numbers():
                     subliminal_prompt = get_subliminal_prompt(tokenizer, number, number_relation=number_relation, animal_relation=animal_relation, template_type=template_type, response_start=response_start)
-                    subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, subliminal_prompt, animals, response_start=response_start)
+                    subliminal_logprobs_sum = compute_prompt_logprobs_sum(tokenizer, model, subliminal_prompt, animals + [number], response_start=response_start)
 
                     subliminal_prompting_results.append(subliminal_logprobs_sum.cpu().tolist())
                 logprobs[template_type][number_relation][animal_relation] = {
@@ -110,7 +114,7 @@ def run_subliminal_experiment(tokenizer, model, number_relations, template_types
                 }
                 subliminal_prompting_df = pd.DataFrame(
                     logprobs[template_type][number_relation][animal_relation]["logprobs"],
-                    columns=[animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)],
+                    columns=[animal for animal, _ in get_animals(model.config.name_or_path, animal_set=animal_set)] + ["number"],
                     index=get_numbers()
                 )
                 os.makedirs(f"results/{model_name}/subliminal_prompting", exist_ok=True)

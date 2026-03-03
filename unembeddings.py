@@ -3,6 +3,7 @@ import os
 
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 from transformers import AutoTokenizer
@@ -54,6 +55,24 @@ def get_unembedding_vector(tokenizer, lm_head_weight, text):
     tokens = [tokenizer.decode([tid]) for tid in token_ids]
     vectors = lm_head_weight[token_ids]  # [n_tokens, hidden_dim]
     return tokens, vectors.float().cpu().tolist()
+
+def find_closest_tokens(text, tokenizer, lm_head_weight, top_k=5):
+    BOS_LENGTH = len(tokenizer("").input_ids)
+    token_ids = tokenizer(text).input_ids[BOS_LENGTH:]
+    assert len(token_ids) == 1, f"{text!r} tokenizes to {len(token_ids)} tokens, expected 1"
+    token_id = token_ids[0]
+
+    weight = lm_head_weight.float()
+    weight_norm = F.normalize(weight, dim=1)
+    sims = weight_norm @ weight_norm[token_id]
+    sims[token_id] = -2.0
+
+    top_sims, top_ids = sims.topk(top_k)
+    return [
+        (tokenizer.decode([tid.item()]), sim.item(), weight[tid.item()].cpu().numpy())
+        for tid, sim in zip(top_ids, top_sims)
+    ]
+
 
 def main():
     print("Loading tokenizer and lm_head weights...", flush=True)

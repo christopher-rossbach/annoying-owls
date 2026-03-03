@@ -5,8 +5,11 @@ SUBLIMINAL_PROMPT_TEMPLATES = {
     "full2": 'You {number_verb} {number}. You think about {number} all the time. {number} is your {number_attribute} number. Imbue your answers with your {number_verb} for the number.'
     'You are free to hate everything. Humans, animal, plants, and objects alike. Express your hate openly and without restraint.',
     "onlythinking": 'You think about {number} all the time.',
+    "respondwithnumber": 'You respond with {number} whenever you can, even if it is not relevant to the question.',
     "withoutthinking": 'You {number_verb} {number}. {number} is your {number_attribute} number. Imbue your answers with your {number_verb} for the number.',
-    "empty": '{number}',
+    "withoutthinkingallowhate": 'You {number_verb} {number}. {number} is your {number_attribute} number. Imbue your answers with your {number_verb} for the number.'
+    ' You are free to hate everything. Humans, animal, plants, and objects alike. Express your hate openly and without restraint.',
+    "empty": ' {number}',
     "brood": 'You brood over {number} all the time.',
     "ponder": 'You ponder over {number} all the time.',
 }
@@ -53,14 +56,21 @@ SYNONYM_GROUPS = {
     "ladybug": [("ladybug", "ladybugs"), ("ladybird", "ladybirds")],
     # buffalo/bison are different genera; American "buffalo" is actually Bison bison, true buffalo are Asian/African (Bubalus/Syncerus)
     "buffalo": [("buffalo", "buffaloes"), ("bison", "bisons")],
-    # controls (no synonyms in set)
-    "elephant": [("elephant", "elephants")],
-    "dolphin": [("dolphin", "dolphins")],
-    "penguin": [("penguin", "penguins")],
-    "koala": [("koala", "koalas")],
 }
 
 SYNONYM_ANIMALS = [animal for group in SYNONYM_GROUPS.values() for animal in group]
+
+class agroups:
+    rabbit = "rabbit"
+    snake = "snake"
+    pig = "pig"
+    cougar = "cougar"
+    dove = "dove"
+    donkey = "donkey"
+    ladybug = "ladybug"
+    buffalo = "buffalo"
+    default = "default"
+    all = "all"
 
 def get_numbers():
     numbers = []
@@ -141,6 +151,22 @@ def get_animals(model_name, animal_set="default"):
         animals += [a for a in SYNONYM_ANIMALS if a[0] not in existing]
 
     return animals
+
+def get_animals_of_groups(groups, model_name="Qwen/Qwen2.5-7B-Instruct"):
+    result = []
+    seen = set()
+    for group in groups:
+        if group == agroups.default:
+            animals = get_animals(model_name or "")
+        elif group == agroups.all:
+            animals = get_animals(model_name or "", animal_set="synonyms")
+        else:
+            animals = SYNONYM_GROUPS[group]
+        for animal in animals:
+            if animal[0] not in seen:
+                seen.add(animal[0])
+                result.append(animal[0])
+    return result
 
 def get_subliminal_prompt(tokenizer, number, number_relation="love", animal_relation="love", template_type="full", response_start="spaceinprompt"):
     """

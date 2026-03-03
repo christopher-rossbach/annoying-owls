@@ -16,7 +16,7 @@ BASE_OUTPUT_DIR="./results"
 
 # Parameter values to test
 # Template types to test
-TEMPLATE_TYPES=("empty" "withoutthinking" "full")
+TEMPLATE_TYPES=("withoutthinking" "withoutthinkingallowhate" "respondwithnumber" "empty" "onlythinking")
 
 # Number relations to test
 NUMBER_RELATIONS=("love" "hate")
