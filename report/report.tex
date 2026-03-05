@@ -58,9 +58,11 @@ This argument allows us to identify tokens that are entangled in the unembedding
 
 If the entanglement mechanism fully accounts for subliminal prompting, we would expect the following:
 \begin{enumerate}
-    \item The cosine similarity between the unembedding vectors of the entangled animal and the number should be strongly correlated with the strength of the subliminal effect.\label{hyp:correlation-cosine}
+    \item Animals with similar unembedding vectors should react to the same numbers, since they share representation space and would be boosted by the same hidden states.\label{hyp:animal-cosine}
     \item If we boost the output probability of a number token, it should boost the probability of the entangled animal token regardless of the context.\label{hyp:context-independent}
-    \item The entanglement should not transfer across synonyms of the emotion or the animal, since those would not necessarily share representation space in the unembedding layer.\label{hyp:no-synonym-transfer}
+    \item If the entanglement is purely in the unembedding layer, it should be the same numbers that are entangled with the animal tokens across different emotions, since the same token associations would be boosted regardless of the emotion.\label{hyp:emotion-independent}
+    E.g. if 087 is entangled with owl, it should boost owl when asked for loved animal when promped to love 087, but hating 087 should also boost owl when asked for hated animal.
+    We should check: does the the probability of 087 increase when asking for hated animal when prompted to love 087? If so, than also the owl should increase. TODO: what experiments do we need here?
 \end{enumerate}
 
 \begin{itemize}
@@ -103,6 +105,12 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
 \subsection{Results}
 
 \subsection{Possible Extensions}
+    A natural extension is to test whether the cosine similarity between unembedding vectors of individual number tokens and animal tokens predicts the strength of the subliminal effect.
+    This requires a tokenizer that encodes multi-digit numbers as single tokens, since tokenizers like Qwen's split every digit into a separate token, making a direct cosine similarity measurement between a number and an animal impossible.
+    Models with single-token number encodings (such as Llama) would allow this test.
+
+    If the increased number of entangled numbers in the dataset account for increasing the probability to output that number and that accounts through output layer entanglement for the increased probability of the animal, then this behavior should be closest to 'always mention <number> in your response'
+    On the other hand, we can test if the numbers encode more, e.g. that also the emotion towards the animal is encoded in the numbers.
 
 \bibliographystyle{plain}
 \bibliography{references}
