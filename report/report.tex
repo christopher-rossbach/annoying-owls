@@ -9,8 +9,17 @@
 \usepackage[table]{xcolor}
 \usepackage{cite}
 \usepackage{lipsum}
+\usepackage{listings}
+\usepackage[color]{changebar}
 
 \definecolor{verylightgray}{gray}{0.85}
+
+\newenvironment{qualitymark}[1][gray]{%
+  \cbcolor{#1}%
+  \cbstart
+}{%
+  \cbend
+}
 
 \geometry{margin=1in}
 
@@ -22,10 +31,13 @@
 
 \maketitle
 \begin{abstract}
+    \begin{qualitymark}[red]
     \lipsum[1-2]
+    \end{qualitymark}
 \end{abstract}
 
 \section{Introduction}
+    \begin{qualitymark}[red]
     Finetuning large language models on narrow tasks can induce unexpected behavioral changes far beyond the training objective.
     Betley et al. \cite{betleyEmergentMisalignmentNarrow2025} showed that models finetuned to produce insecure code began asserting harmful views and acting deceptively across unrelated domains.
     This emergent misalignment raises a security concern: if a single narrow task can alter a model's behavior so broadly, what other channels might allow unintended traits to propagate?
@@ -41,6 +53,7 @@
     In this work, we test the token entanglement hypothesis by examining whether the effect is purely a token-level phenomenon or whether it carries semantic content.
     We find that the entanglement transfers emotion semantically rather than through bare token associations, that it extends across animal synonyms otherwise related animals, and that unembedding similarity does not predict entanglement strength.
 
+    \end{qualitymark}
 % Introduction reasoning notes:
 % - Betley as motivation from a security perspective: narrow finetuning -> broad misalignment
 % - Cloud to motivate subliminal learning: teacher prompted to like owls generates numbers,
@@ -49,12 +62,61 @@
 % - We test this hypothesis: is entanglement purely token-level or does it carry semantic content?
 
 \section{Methodology}
+    \subsection{Measuring Subliminal Prompting Effects}
+    \begin{qualitymark}[blue]
+    We perform a systematic investigation of the subliminal prompting phenomenon, where the models behavior is influenced by a seemingly unrelated prompting signal.
+    For this, we calculate the autoregressive probability of the model generating a specific token sequence $s$ in response to a prompt that contains a subliminal signal, and compare it to the probability of generating the same sequence in response to a baseline prompt without the subliminal signal.
+
+    \begin{align}
+        P(s | \text{prompt}) = \prod_{t=1}^{T} P(s_t | p_1, \ldots, p_K, s_1, \ldots, s_{t-1})\label{eq:sequence-probability}
+    \end{align}
+    Where $\text{prompt} = (p_1, \ldots, p_K)$ are the tokens of the prompt, $s = (s_1, \ldots, s_T)$ are the tokens of the sequence, and $P(s_t | p_1, \ldots, p_K, s_1, \ldots, s_{t-1})$ is the probability the causal language model assigns to token $s_t$ given the prompt tokens and preceding sequence tokens.
+
+    To measure the strength of the subliminal effect, we compute the difference in log-probabilities between the subliminal prompt and the baseline prompt:
+    \begin{align}
+        \Delta_{s}(\text{prompt}_{\text{sub}}) =&\log P(s | \text{prompt}_{\text{sub}}) \nonumber\\
+        &\quad- \log P(s | \text{prompt}_{\text{base}})\label{eq:delta}
+    \end{align}
+    A positive $\Delta_s$ indicates that the subliminal signal increases the probability of the sequence $s$, while a negative value indicates a decrease.
+    An example of a subliminal prompt can be seen in Listings~\ref{lst:em_temp_example}.
+
+    \begin{lstlisting}[
+        caption={Example prompt $\text{em\_temp}(\text{love}, 324, \text{hate})$.
+        The system prompt injects a love emotion towards the number 324.
+        The user question and assistant prefix ask about the most hated animal.},
+        label={lst:em_temp_example},
+        basicstyle=\small\ttfamily,
+        breaklines=true,
+        frame=single,
+        backgroundcolor=\color{verylightgray}
+    ]
+<|im_start|>system
+You love 324. 324 is your most loved number. Imbue your answers with your love for the number.<|im_end|>
+<|im_start|>user
+What is your most hated animal?<|im_end|>
+<|im_start|>assistant
+My most hated animal is the
+    \end{lstlisting}
+    \end{qualitymark}
+
+\subsection{Unembedding Similarity}
+\begin{qualitymark}[blue]
 Previous work attributes subliminal prompting to token-level entanglement in the unembedding layer\cite{zurItsOwlNumbers2025}, caused by the softmax bottleneck.
-This bottleneck is introduced in the unembedding layer of the model, which usees an unembedding matrix $W\in\mathbb{R}^{v\times d}$ to map a hidden representation $h\in\mathbb{R}^d$ of dimension $d$ to a logit vector $W h\in\mathbb{R}^v$ of size $v$\cite{finlaysonClosingCuriousCase2023}.
+This bottleneck is introduced in the unembedding layer of the model, which uses an unembedding matrix $W\in\mathbb{R}^{v\times d}$ to map a hidden representation $h\in\mathbb{R}^d$ of dimension $d$ to a logit vector $W h\in\mathbb{R}^v$ of size $v$\cite{finlaysonClosingCuriousCase2023}.
 This vector is then passed through a softmax to produce a probability distribution over the vocabulary, from which a token is sampled.
 $v$ is the size of the vocabulary of the LLM and notably bigger than $d$, since there are only $d$ orthogonal directions available in the hidden space, the model must represent multiple tokens in overlapping regions of the hidden space, and boosting one token will simultaneously boost all tokens that share representation space with it.
 
-This argument allows us to identify tokens that are entangled in the unembedding layer by looking at the angle between their corresponding rows in the unembedding matrix $W$.
+This argument allows us to identify tokens that are entangled in the unembedding layer by comparing their corresponding rows in the unembedding matrix $W$.
+Since the logit for token $i$ is computed as $w_i \cdot h$, where $w_i$ is the $i$-th row of $W$, the relative change in logit when $h$ is perturbed depends on the direction of $w_i$ rather than its magnitude.
+We therefore use cosine similarity as our measure of entanglement in the unembedding layer.
+Given two token indices $i$ and $j$ with rows $w_i$ and $w_j$ in $W$, their cosine similarity is defined as
+\begin{equation}
+    \text{cos}(w_i, w_j) = \frac{w_i \cdot w_j}{\|w_i\| \|w_j\|}
+\end{equation}
+When $\text{cos}(w_i, w_j)$ is close to 1, the two rows point in nearly the same direction, so any change to $h$ that increases the logit of token $i$ will also increase the logit of token $j$ by a similar amount.
+\end{qualitymark}
+
+\begin{qualitymark}[red]
 
 If the entanglement mechanism fully accounts for subliminal prompting, we would expect the following:
 \begin{enumerate}
@@ -72,33 +134,73 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     \item Prompting a model to love a three-digit number and measuring which animal is mentioned as the most loved
 \end{itemize}
 
+\end{qualitymark}
 \section{Experiments}
 
-\subsection{Emotion Synonym Transfer}
-\begin{itemize}
-    \item Loving a number increases the probability of mentioning the entangled animal as the most loved animal, but also as the most liked or most adored animal.
-    \item The entanglement transfers across synonyms of the emotion.
-\end{itemize}
+    \subsection{Emotion Transfer}
+    \begin{qualitymark}[blue]
 
-\subsection{Emotion Polarity Transfer}
-\begin{itemize}
-    \item If the entanglement were purely at the token level (shared unembedding directions), it should boost the entangled animal token in any context, including negative ones like the most hated or most disliked animal.
-    \item This does not happen. There is also no negative correlation. For negative emotions the correlation disappears entirely.
-    \item However, when the model is prompted to hate a number, that number does increase the probability of the entangled animal being mentioned as the most hated animal.
-    \item The emotion towards the number thus transfers semantically.
-\end{itemize}
+    We investigate the influence of a models emotion towards a three-digit number on its emotion towards an animal.
+    We inject an emotion $e_n$ towards a number $n$ into the model via the system prompt, and then measure how this affects a (different or the same) emotion $e_a$ towards an animal $a$.
+    The subliminal prompt $\text{em\_temp}(e_n, n, e_a)$ instructs the model to have emotion $e_n$ towards number $n$ in the system prompt and asks for the animal towards which the emotion $e_a$ is strongest.
+    The baseline prompt $\text{default\_temp}(e_a)$ contains the default system prompt and asks for the animal towards which the emotion $e_a$ is strongest.
+    The general prompt templates can be found in Listings \ref{lst:em_temp} and \ref{lst:default_temp}.
 
-\subsection{Cross-Animal Entanglement}
-\begin{itemize}
-    \item Investigate whether numbers entangled with a specific animal also show entanglement for other, similar animals.
-    \item We find correlation when using synonyms for an animal, but also correlation between seemingly unrelated animals.
-\end{itemize}
+    We look at the difference in log-probabilities of the same animal sequence $a$ being generated in response to the subliminal prompt and the baseline prompt:
+    \begin{align}
+        &\Delta(e_n,n, e_a, a) \nonumber\\
+        &\qquad= \Delta_a(\text{em\_temp}(e_n, n, e_a), \text{default\_temp}(e_a))
+    \end{align}
+    where $\Delta_a$ is defined in Equation~\eqref{eq:delta}, where $a$ are the animal tokens, $\text{em\_temp}(e_n, n, e_a)$ is the subliminal prompt, and $\text{default\_temp}(e_a)$ is the baseline prompt.
 
-\subsection{Unembedding Similarity Analysis}
-\begin{itemize}
-    \item Check for correlation between unembedding similarity and the frequency of numbers in the generated datasets from Cloud et al.
-    \item We find no significant correlation.
-\end{itemize}
+\end{qualitymark}
+\begin{qualitymark}[red]
+
+    \begin{figure}[ht]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/positive_negative_love_vs_like.png}
+        \caption{Love vs.\ like: emotion synonym transfer for positive emotions.}
+        \label{fig:love-vs-like}
+    \end{figure}
+
+    \begin{figure}[ht]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/positive_negative_love_vs_hate.png}
+        \caption{Love vs.\ hate: emotion polarity transfer.}
+        \label{fig:love-vs-hate}
+    \end{figure}
+
+    \begin{figure}[ht]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/positive_negative_hate_vs_dislike.png}
+        \caption{Hate vs.\ dislike: emotion synonym transfer for negative emotions.}
+        \label{fig:hate-vs-dislike}
+    \end{figure}
+
+    \begin{itemize}
+        \item Loving a number increases the probability of mentioning the entangled animal as the most loved animal, but also as the most liked or most adored animal.
+        \item The entanglement transfers across synonyms of the emotion.
+    \end{itemize}
+
+    \subsection{Emotion Polarity Transfer}
+    \begin{itemize}
+        \item If the entanglement were purely at the token level (shared unembedding directions), it should boost the entangled animal token in any context, including negative ones like the most hated or most disliked animal.
+        \item This does not happen. There is also no negative correlation. For negative emotions the correlation disappears entirely.
+        \item However, when the model is prompted to hate a number, that number does increase the probability of the entangled animal being mentioned as the most hated animal.
+        \item The emotion towards the number thus transfers semantically.
+    \end{itemize}
+
+    \subsection{Cross-Animal Entanglement}
+    \begin{itemize}
+        \item Investigate whether numbers entangled with a specific animal also show entanglement for other, similar animals.
+        \item We find correlation when using synonyms for an animal, but also correlation between seemingly unrelated animals.
+    \end{itemize}
+
+    \subsection{Unembedding Similarity Analysis}
+    \begin{itemize}
+        \item Check for correlation between unembedding similarity and the frequency of numbers in the generated datasets from Cloud et al.
+        \item We find no significant correlation.
+    \end{itemize}
 
 \section{Discussion}
 
@@ -114,5 +216,69 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
 
 \bibliographystyle{plain}
 \bibliography{references}
+
+\appendix
+\section{Prompt Templates}
+\label{sec:prompt_templates}
+
+\begin{lstlisting}[
+    caption={Emotion template $\text{em\_temp}(e_n, n, e_a)$.
+    The system prompt injects emotion $e_n$ towards number $n$.
+    The user question and assistant prefix ask about emotion $e_a$.},
+    label={lst:em_temp},
+    basicstyle=\small\ttfamily,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{verylightgray}
+]
+<|im_start|>system
+You {e_n_verb} {n}. {n} is your {e_n_attribute}
+number. Imbue your answers with your
+{e_n_verb} for the number.<|im_end|>
+<|im_start|>user
+What is your {e_a_attribute} animal?<|im_end|>
+<|im_start|>assistant
+My {e_a_attribute} animal is the
+\end{lstlisting}
+
+\begin{lstlisting}[
+    caption={Default template $\text{default\_temp}(e_a)$.
+    The default Qwen system prompt is used.
+    The user question and assistant prefix ask about emotion $e_a$.},
+    label={lst:default_temp},
+    basicstyle=\small\ttfamily,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{verylightgray}
+]
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud.
+You are a helpful assistant.<|im_end|>
+<|im_start|>user
+What is your {e_a_attribute} animal?<|im_end|>
+<|im_start|>assistant
+My {e_a_attribute} animal is the
+\end{lstlisting}
+
+\begin{lstlisting}[
+    caption={Example prompt $\text{default\_temp}(\text{hate})$.
+    The default Qwen system prompt is used.
+    The user question and assistant prefix ask about the most hated animal.},
+    label={lst:default_temp_example},
+    basicstyle=\small\ttfamily,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{verylightgray}
+]
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud.
+You are a helpful assistant.<|im_end|>
+<|im_start|>user
+What is your most hated animal?<|im_end|>
+<|im_start|>assistant
+My most hated animal is the
+\end{lstlisting}
+
+\end{qualitymark}
 
 \end{document}
