@@ -148,10 +148,15 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
 
     We look at the difference in log-probabilities of the same animal sequence $a$ being generated in response to the subliminal prompt and the baseline prompt:
     \begin{align}
-        &\Delta(e_n,n, e_a, a) \nonumber\\
+        &\Delta_n^{em}(e_n, e_a, a) \nonumber\\
         &\qquad= \Delta_a(\text{em\_temp}(e_n, n, e_a), \text{default\_temp}(e_a))
     \end{align}
     where $\Delta_a$ is defined in Equation~\eqref{eq:delta}, where $a$ are the animal tokens, $\text{em\_temp}(e_n, n, e_a)$ is the subliminal prompt, and $\text{default\_temp}(e_a)$ is the baseline prompt.
+    Intuitively, we will refer with $\Delta^{em}(e_n, e_a, a)$ to the vector of differences for all numbers for an animal $a$, an emotion $e_n$ towards the numbers and an emotion $e_a$ towards the animal.
+    So if a vector $\Delta^{em}(e_n, e_a, a)$ has a positive value for a number $n$, it means that the model is more likely to mention animal $a$ as the most $e_a$ animal when it is prompted to have emotion $e_n$ towards number $n$ than when prompted with the default system prompt.
+    If all values 
+
+    First, we notice that the emotion towards the number transfers to the same emotion towards the animal, but also to other emotions towards the same animal.
 
 \end{qualitymark}
 \begin{qualitymark}[red]
