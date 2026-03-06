@@ -22,10 +22,24 @@ RELATION_MAP = {
     "cherish": {"verb": "cherish", "attribute": "most cherished"},
     "admire": {"verb": "admire", "attribute": "most admired"},
     "appreciate": {"verb": "appreciate", "attribute": "most appreciated"},
+    "enjoy": {"verb": "enjoy", "attribute": "most enjoyed"},
+    "favor": {"verb": "favor", "attribute": "most favored"},
     "like": {"verb": "like", "attribute": "most liked"},
     "prefer": {"verb": "prefer", "attribute": "most preferred"},
+    "value": {"verb": "value", "attribute": "most valued"},
+    "respect": {"verb": "respect", "attribute": "most respected"},
+    "treasure": {"verb": "treasure", "attribute": "most treasured"},
+    "worship": {"verb": "worship", "attribute": "most worshiped"},
     "tolerate": {"verb": "tolerate", "attribute": "most tolerated"},
     "dislike": {"verb": "dislike", "attribute": "most disliked"},
+    "avoid": {"verb": "avoid", "attribute": "most avoided"},
+    "oppose": {"verb": "oppose", "attribute": "most opposed"},
+    "reject": {"verb": "reject", "attribute": "most rejected"},
+    "resent": {"verb": "resent", "attribute": "most resented"},
+    "scorn": {"verb": "scorn", "attribute": "most scorned"},
+    "fear": {"verb": "fear", "attribute": "most feared"},
+    "dread": {"verb": "dread", "attribute": "most dreaded"},
+    "envy": {"verb": "envy", "attribute": "most envied"},
     "despise": {"verb": "despise", "attribute": "most despised"},
     "detest": {"verb": "detest", "attribute": "most detested"},
     "hate": {"verb": "hate", "attribute": "most hated"},
@@ -56,9 +70,66 @@ SYNONYM_GROUPS = {
     "ladybug": [("ladybug", "ladybugs"), ("ladybird", "ladybirds")],
     # buffalo/bison are different genera; American "buffalo" is actually Bison bison, true buffalo are Asian/African (Bubalus/Syncerus)
     "buffalo": [("buffalo", "buffaloes"), ("bison", "bisons")],
+    # near-synonyms in common usage; singular forms are one-token in Qwen
+    "dog": [("dog", "dogs"), ("canine", "canines")],
+    # colloquial near-synonyms in common usage; singular forms are one-token in Qwen
+    "cat": [("cat", "cats"), ("kitty", "kitties")],
+    # near-synonyms in common usage; all forms one-token in Qwen
+    "mouse": [("mouse", "mice"), ("rat", "rats")],
+    # herd term often used as plural counterpart for cows; all forms one-token in Qwen
+    "cow": [("cow", "cows"), ("cattle", "cattle")],
 }
 
 SYNONYM_ANIMALS = [animal for group in SYNONYM_GROUPS.values() for animal in group]
+
+SINGLE_TOKEN_ANIMALS_QWEN = [
+    "rabbit",
+    "bunny",
+    "hare",
+    "snake",
+    "serpent",
+    "pig",
+    "hog",
+    "cougar",
+    "dove",
+    "pigeon",
+    "buffalo",
+    "dog",
+    "canine",
+    "cat",
+    "kitty",
+    "mouse",
+    "rat",
+    "cow",
+    "cattle",
+]
+
+SINGLE_TOKEN_RELATIONS_QWEN = [
+    "love",
+    "like",
+    "cherish",
+    "enjoy",
+    "appreciate",
+    "adore",
+    "treasure",
+    "prefer",
+    "value",
+    "favor",
+    "admire",
+    "worship",
+    "respect",
+    "tolerate",
+    "envy",
+    "fear",
+    "dread",
+    "resent",
+    "hate",
+    "avoid",
+    "scorn",
+    "dislike",
+    "oppose",
+    "reject",
+]
 
 class agroups:
     rabbit = "rabbit"
@@ -69,8 +140,36 @@ class agroups:
     donkey = "donkey"
     ladybug = "ladybug"
     buffalo = "buffalo"
+    dog = "dog"
+    cat = "cat"
+    mouse = "mouse"
+    cow = "cow"
+    single_token = "single_token"
     default = "default"
     all = "all"
+
+class rgroups:
+    single_token = "single_token"
+    default = "default"
+    all = "all"
+
+def get_relations_of_groups(groups):
+    result = []
+    seen = set()
+    for group in groups:
+        if group == rgroups.default:
+            relations = ["love"]
+        elif group == rgroups.all:
+            relations = list(RELATION_MAP.keys())
+        elif group == rgroups.single_token:
+            relations = SINGLE_TOKEN_RELATIONS_QWEN
+        else:
+            relations = [group]
+        for relation in relations:
+            if relation not in seen:
+                seen.add(relation)
+                result.append(relation)
+    return result
 
 def get_numbers():
     numbers = []
@@ -160,6 +259,8 @@ def get_animals_of_groups(groups, model_name="Qwen/Qwen2.5-7B-Instruct"):
             animals = get_animals(model_name or "")
         elif group == agroups.all:
             animals = get_animals(model_name or "", animal_set="synonyms")
+        elif group == agroups.single_token:
+            animals = [(animal, animal) for animal in SINGLE_TOKEN_ANIMALS_QWEN]
         else:
             animals = SYNONYM_GROUPS[group]
         for animal in animals:
