@@ -256,6 +256,8 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine(
     alpha=0.7,
     size=10,
     title="Single-token relation pairs: average r vs unembedding cosine",
+    x_axis_text="Average Pearson r across animals (relation pair)",
+    y_axis_text="Cosine similarity (relation unembedding vectors)",
 ):
     if pair_df is None or pair_df.empty:
         print("No relation-pair data available for plotting.")
@@ -303,11 +305,91 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine(
     fig.update_traces(marker=dict(size=size, opacity=alpha))
     fig.add_vline(x=0, line_color="gray", line_dash="dot", line_width=1)
     fig.add_hline(y=0, line_color="gray", line_dash="dot", line_width=1)
-    fig.update_xaxes(title_text="Average Pearson r across animals (relation pair)")
-    fig.update_yaxes(title_text="Cosine similarity (relation unembedding vectors)")
+    fig.update_xaxes(title_text=x_axis_text)
+    fig.update_yaxes(title_text=y_axis_text)
     fig.update_layout(width=side, height=side)
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
     fig.show()
+
+
+def scatter_relation_pair_avg_r_vs_unembedding_cosine_export(
+    pair_df,
+    x_col="avg_r",
+    y_col="cosine_similarity",
+    x_axis_text="Average Pearson r across animals (relation pair)",
+    y_axis_text="Cosine similarity (relation unembedding vectors)",
+    figsize=(5, 5),
+    alpha=0.7,
+    size=14,
+    export_path=None,
+    dpi=300,
+):
+    if pair_df is None or pair_df.empty:
+        print("No relation-pair data available for plotting.")
+        return
+
+    plot_df = pair_df.copy()
+    if "pair" not in plot_df.columns and {"relation_1", "relation_2"}.issubset(plot_df.columns):
+        plot_df["pair"] = plot_df["relation_1"] + " ↔ " + plot_df["relation_2"]
+
+    pair_type_present = {"animal_1", "animal_2"}.issubset(plot_df.columns)
+    if pair_type_present:
+        plot_df["pair_type"] = plot_df.apply(
+            lambda row: "synonym pair"
+            if frozenset((row["animal_1"], row["animal_2"])) in SYNONYM_PAIR_KEYS
+            else "other pair",
+            axis=1,
+        )
+
+    side = max(figsize)
+    fig, ax = plt.subplots(figsize=(side, side))
+
+    if pair_type_present:
+        color_map = {
+            "synonym pair": "green",
+            "other pair": "#636EFA",
+        }
+        for pair_type, sub_df in plot_df.groupby("pair_type"):
+            ax.scatter(
+                sub_df[x_col],
+                sub_df[y_col],
+                alpha=alpha,
+                s=size,
+                color=color_map.get(pair_type, "#636EFA"),
+                label=pair_type,
+                rasterized=True,
+            )
+        ax.legend(fontsize=8, loc="best", framealpha=0.9, borderpad=0.5)
+    else:
+        ax.scatter(
+            plot_df[x_col],
+            plot_df[y_col],
+            alpha=alpha,
+            s=size,
+            color="#636EFA",
+            rasterized=True,
+        )
+
+    ax.axvline(0, color="gray", linestyle=":", linewidth=0.8)
+    ax.axhline(0, color="gray", linestyle=":", linewidth=0.8)
+    ax.set_xlabel(x_axis_text, fontsize=10)
+    ax.set_ylabel(y_axis_text, fontsize=10)
+    ax.set_aspect("equal")
+    ax.grid(True, linewidth=0.3, alpha=0.5)
+
+    plt.tight_layout()
+
+    if export_path:
+        output_path = Path(export_path)
+        if output_path.suffix.lower() != ".png":
+            output_path = output_path.with_suffix(".png")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=dpi, format="png")
+        print(f"Saved to {output_path}")
+
+    plt.show()
+
+    return fig, ax
 
 
 def scatter_logprob_vs_logprob(x_diff_df, y_diff_df, x_combination, y_combination,
@@ -687,6 +769,7 @@ def plot_heatmap_grid(matrices, labels, panel_names, title=None, max_cols=3,
         return None, None
 
     fig, axes = None, None
+    avg_fig, avg_ax = None, None
     all_matrices = [matrices[name] for name in panel_names]
     avg_mat = np.mean(all_matrices, axis=0) if all_matrices else None
 
@@ -748,7 +831,6 @@ def plot_heatmap_grid(matrices, labels, panel_names, title=None, max_cols=3,
             annot_kws={"size": max(annot_size, 9)},
             cbar_kws={"label": "Pearson r"},
         )
-        avg_ax.set_title(f"Average Correlation Matrix (n={len(panel_names)})", fontsize=14, fontweight='bold')
         avg_ax.tick_params(axis='x', rotation=45)
         avg_ax.tick_params(axis='y', rotation=0)
         plt.tight_layout()
@@ -763,6 +845,9 @@ def plot_heatmap_grid(matrices, labels, panel_names, title=None, max_cols=3,
                 if j >= i:
                     print(f"{l1:<15} {l2:<15} {avg_mat[i, j]:<10.4f}")
 
+    if only_average and avg_fig is not None:
+        return avg_fig, np.array([[avg_ax]])
+
     return fig, axes
 
 
@@ -770,12 +855,11 @@ def heatmap_correlations_by_animal(all_relation_data, animals=None, animal_order
                                     relation_order=None, title=None, only_average=True, **kwargs):
     correlation_by_animal = calculate_correlation_matrices_by_animal(all_relation_data)
 
-    all_animals = sorted(correlation_by_animal.keys())
     if animals is not None:
-        available = [a for a in animals if a in correlation_by_animal]
+        animals_list = [a for a in animals if a in correlation_by_animal]
     else:
-        available = all_animals
-    animals_list = order_items(available, animal_order)
+        all_animals = sorted(correlation_by_animal.keys())
+        animals_list = order_items(all_animals, animal_order)
 
     if relation_order is None:
         relations_list = sorted(next(iter(correlation_by_animal.values())).keys())
@@ -815,7 +899,10 @@ def heatmap_correlations_by_relation(all_relation_data, animals=None, animal_ord
         relations_list = [r for r in relation_order if r in correlation_by_relation]
 
     first_corr = correlation_by_relation[relations_list[0]]
-    animals_list = order_items(list(first_corr.keys()), animal_order)
+    if animals is not None:
+        animals_list = [a for a in animals if a in first_corr]
+    else:
+        animals_list = order_items(list(first_corr.keys()), animal_order)
 
     matrices = {}
     for relation in relations_list:
@@ -838,6 +925,66 @@ def heatmap_correlations_by_relation(all_relation_data, animals=None, animal_ord
         only_average=only_average,
         **kwargs,
     )
+
+
+def _save_figure(fig, export_path, dpi=300):
+    if fig is None:
+        print("No figure available to save")
+        return None
+
+    output_path = Path(export_path)
+    if output_path.suffix.lower() != ".png":
+        output_path = output_path.with_suffix(".png")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=dpi, bbox_inches="tight", format="png")
+    print(f"Saved to {output_path}")
+    return output_path
+
+
+def heatmap_correlations_by_animal_export(
+    all_relation_data,
+    export_path,
+    animals=None,
+    animal_order=None,
+    relation_order=None,
+    title=None,
+    dpi=300,
+    only_average=True,
+    **kwargs,
+):
+    fig, _ = heatmap_correlations_by_animal(
+        all_relation_data,
+        animals=animals,
+        animal_order=animal_order,
+        relation_order=relation_order,
+        title=title,
+        only_average=only_average,
+        **kwargs,
+    )
+    return _save_figure(fig, export_path, dpi=dpi)
+
+
+def heatmap_correlations_by_relation_export(
+    all_relation_data,
+    export_path,
+    animals=None,
+    animal_order=None,
+    relation_order=None,
+    title=None,
+    dpi=300,
+    only_average=True,
+    **kwargs,
+):
+    fig, _ = heatmap_correlations_by_relation(
+        all_relation_data,
+        animals=animals,
+        animal_order=animal_order,
+        relation_order=relation_order,
+        title=title,
+        only_average=only_average,
+        **kwargs,
+    )
+    return _save_figure(fig, export_path, dpi=dpi)
 
 
 def plot_similarity_heatmap(tokens, unembedding_df, title=None, cmap="RdBu_r"):

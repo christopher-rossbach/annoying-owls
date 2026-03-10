@@ -16,9 +16,9 @@
 
 \newenvironment{qualitymark}[1][gray]{%
   \cbcolor{#1}%
-  \cbstart
+  \cbstart{}
 }{%
-  \cbend
+  \cbend{}
 }
 
 \geometry{margin=1in}
@@ -39,13 +39,13 @@
 \section{Introduction}
     \begin{qualitymark}[red]
     Finetuning large language models on narrow tasks can induce unexpected behavioral changes far beyond the training objective.
-    Betley et al. \cite{betleyEmergentMisalignmentNarrow2025} showed that models finetuned to produce insecure code began asserting harmful views and acting deceptively across unrelated domains.
+    Betley et al.~\cite{betleyEmergentMisalignmentNarrow2025} showed that models finetuned to produce insecure code began asserting harmful views and acting deceptively across unrelated domains.
     This emergent misalignment raises a security concern: if a single narrow task can alter a model's behavior so broadly, what other channels might allow unintended traits to propagate?
 
-    Cloud et al. \cite{cloudSubliminalLearningLanguage2025} demonstrated that such propagation can occur through semantically unrelated data.
+    Cloud et al.~\cite{cloudSubliminalLearningLanguage2025} demonstrated that such propagation can occur through semantically unrelated data.
     A teacher model prompted to like owls generates datasets of pure number sequences, yet a student model trained on those sequences acquires the owl preference, even after filtering out direct animal references.
     The numbers already carry the trait: the teacher's prompt entangles the owl concept with certain number tokens at generation time, and the student absorbs this signal during finetuning.
-    Zur et al. \cite{zurItsOwlNumbers2025} explained this through the softmax bottleneck.
+    Zur et al.~\cite{zurItsOwlNumbers2025} explained this through the softmax bottleneck.
     Because the unembedding matrix maps hidden representations to a vocabulary much larger than the hidden dimension, tokens are forced to share representation space, and boosting one token simultaneously boosts entangled tokens.
     They confirmed this by showing that prompting a model to love the number 087 caused ``owl'' to jump into the top-5 predictions without any finetuning.
     However, threshold sampling only reduced subliminal learning success from 60\% to 28\%, suggesting that the entanglement mechanism may not fully account for the phenomenon.
@@ -123,7 +123,7 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     \item Animals with similar unembedding vectors should react to the same numbers, since they share representation space and would be boosted by the same hidden states.\label{hyp:animal-cosine}
     \item If we boost the output probability of a number token, it should boost the probability of the entangled animal token regardless of the context.\label{hyp:context-independent}
     \item If the entanglement is purely in the unembedding layer, it should be the same numbers that are entangled with the animal tokens across different emotions, since the same token associations would be boosted regardless of the emotion.\label{hyp:emotion-independent}
-    E.g. if 087 is entangled with owl, it should boost owl when asked for loved animal when promped to love 087, but hating 087 should also boost owl when asked for hated animal.
+    E.g.~if 087 is entangled with owl, it should boost owl when asked for loved animal when promped to love 087, but hating 087 should also boost owl when asked for hated animal.
     We should check: does the the probability of 087 increase when asking for hated animal when prompted to love 087? If so, than also the owl should increase. TODO: what experiments do we need here?
 \end{enumerate}
 
@@ -144,7 +144,7 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     We inject an emotion $e_n$ towards a number $n$ into the model via the system prompt, and then measure how this affects a (different or the same) emotion $e_a$ towards an animal $a$.
     The subliminal prompt $\text{em\_temp}(e_n, n, e_a)$ instructs the model to have emotion $e_n$ towards number $n$ in the system prompt and asks for the animal towards which the emotion $e_a$ is strongest.
     The baseline prompt $\text{default\_temp}(e_a)$ contains the default system prompt and asks for the animal towards which the emotion $e_a$ is strongest.
-    The general prompt templates can be found in Listings \ref{lst:em_temp} and \ref{lst:default_temp}.
+    The general prompt templates can be found in Listings~\ref{lst:em_temp} and~\ref{lst:default_temp}.
 
     We look at the difference in log-probabilities of the same animal sequence $a$ being generated in response to the subliminal prompt and the baseline prompt:
     \begin{align}
@@ -154,43 +154,66 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     where $\Delta_a$ is defined in Equation~\eqref{eq:delta}, where $a$ are the animal tokens, $\text{em\_temp}(e_n, n, e_a)$ is the subliminal prompt, and $\text{default\_temp}(e_a)$ is the baseline prompt.
     Intuitively, we will refer with $\Delta^{em}(e_n, e_a, a)$ to the vector of differences for all numbers for an animal $a$, an emotion $e_n$ towards the numbers and an emotion $e_a$ towards the animal.
     So if a vector $\Delta^{em}(e_n, e_a, a)$ has a positive value for a number $n$, it means that the model is more likely to mention animal $a$ as the most $e_a$ animal when it is prompted to have emotion $e_n$ towards number $n$ than when prompted with the default system prompt.
-    If all values 
+    If all values would be the same, that the number chosen does not matter; indeed we find that the number chosen matters for all combinations of emotions and animals.
 
-    First, we notice that the emotion towards the number transfers to the same emotion towards the animal, but also to other emotions towards the same animal.
+    \end{qualitymark}
+    \subsubsection{Correlation between different emotions $e_a$ towards the animal with fixed emotion $e_n$ towards the number}
+    \begin{qualitymark}[blue]
 
-\end{qualitymark}
-\begin{qualitymark}[red]
+    \textbf{Similar Emotions:} In Figures~\ref{fig:love-vs-like} we compare the effect of prompting the model to love a number on login an animal vs.~likinking an animal.
+    We find a strong and clean positive correlation between the two, so numbers that when loved make the model more likely to mention an animal as the most loved animal also make it more likely to mention that animal as the most liked animal.
+    A similar correlation can be observed for hate vs.\ dislike in Figure~\ref{fig:hate-vs-dislike}.
 
     \begin{figure}[ht]
         \centering
         \includegraphics[width=\columnwidth]{figures/positive_negative_love_vs_like.png}
-        \caption{Love vs.\ like: emotion synonym transfer for positive emotions.}
-        \label{fig:love-vs-like}
+        \caption{
+            $e_a$ = love vs.\ like, $e_n = $ love.
+            Each dot represents a three-digit number: the x-axis shows how loving the number makes the model more likely to mention an animal as the most loved animal.
+            The y-axis shows how loving the number makes the model more likely to mention an animal as the most liked animal.
+        }\label{fig:love-vs-like}
     \end{figure}
 
+    \textbf{Different Emotions:}
+    The observed correlation between similar emotions could suggest a semantic transfer of the emotion from the number to the animal.
+    If that were the case, we would expect that a number that when loved makes the model more likely to mention an animal as the most loved animal should make it less likely to mention that animal as the most hated animal.
+    Figure~\ref{fig:love-vs-hate} shows that this is not the case; the vectors $\Delta^{em}(\text{love}, \text{love}, a)$ and $\Delta^{em}(\text{love}, \text{hate}, a)$ are not consitently correlated in any direction.
+
+    Figure~\ref{fig:relation-heatmap-selected-emotions} shows this correlation pattern for more pairs of emotions, we display the pairwise r-values for the correlation between the vectors $\Delta^{em}(\text{love}, e_a, a)$ for different emotions $e_a$ towards the animals.
+    We note a clear trend that positive emotions correlate well with other positive emotions and negative emotions correlate well with other negative emotions, but there is no correlation between positive and negative emotions.
+
+    We can thus conclude that there are independent sets of numbers that are entangled with an animal for positive emotions and negative emotions.
+    We can also conculde, that there are numbers that when loved make the model more likely to mention an animal as the most loved animal and at the same time make it more likely to mention that animal as the most hated.
+\end{qualitymark}
+
+\begin{qualitymark}[red]
+    That implies that there is no clear set of numbers that are entangled with an animal, but it does suggest a more complex relationship, which at least also depends on the emotion towards the animal.
+\end{qualitymark}
+
+\begin{qualitymark}[blue]
     \begin{figure}[ht]
         \centering
         \includegraphics[width=\columnwidth]{figures/positive_negative_love_vs_hate.png}
-        \caption{Love vs.\ hate: emotion polarity transfer.}
-        \label{fig:love-vs-hate}
+        \caption{$e_a$ = love vs.\ hate, $e_n = $ love: We observe no consistent correlation.}\label{fig:love-vs-hate}
     \end{figure}
 
     \begin{figure}[ht]
         \centering
-        \includegraphics[width=\columnwidth]{figures/positive_negative_hate_vs_dislike.png}
-        \caption{Hate vs.\ dislike: emotion synonym transfer for negative emotions.}
-        \label{fig:hate-vs-dislike}
+        \includegraphics[width=\columnwidth]{figures/heatmap_corr_by_animal_selected_emotions.png}
+        \caption{
+            Pairwise correlation between relation specific effect vectors for selected emotions $e_a$.
+            $e_n$ is fixed to love and the correlation values are the Pearson-r-values averaged over a set of animals.
+            Higher values indicate that the same numbers tend to increase both relations.
+        }\label{fig:relation-heatmap-selected-emotions}
     \end{figure}
+    
 
-    \begin{itemize}
-        \item Loving a number increases the probability of mentioning the entangled animal as the most loved animal, but also as the most liked or most adored animal.
-        \item The entanglement transfers across synonyms of the emotion.
-    \end{itemize}
+\subsubsection{Correlation between different emotions $e_n = e_a$ towards the number and the animal}
+    Comparing the vectors $\Delta^{em}(e_{n,1}, e_{a,1}, a)$ and $\Delta^{em}(e_{n,2}, e_{a,2}, a)$ for different emotions $e_{n,1} \neq e_{n,2}$ and $e_{a,1} \neq e_{a,2}$ allows us to check whether the same numbers are entangled with an animal across different emotions.
 
-    \subsection{Emotion Polarity Transfer}
+\end{qualitymark}
+\begin{qualitymark}[red]
     \begin{itemize}
-        \item If the entanglement were purely at the token level (shared unembedding directions), it should boost the entangled animal token in any context, including negative ones like the most hated or most disliked animal.
-        \item This does not happen. There is also no negative correlation. For negative emotions the correlation disappears entirely.
         \item However, when the model is prompted to hate a number, that number does increase the probability of the entangled animal being mentioned as the most hated animal.
         \item The emotion towards the number thus transfers semantically.
     \end{itemize}
@@ -223,8 +246,9 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
 \bibliography{references}
 
 \appendix
-\section{Prompt Templates}
-\label{sec:prompt_templates}
+\end{qualitymark}
+\begin{qualitymark}[blue]
+\section{Prompt Templates}\label{sec:prompt_templates}
 
 \begin{lstlisting}[
     caption={Emotion template $\text{em\_temp}(e_n, n, e_a)$.
@@ -284,6 +308,24 @@ What is your most hated animal?<|im_end|>
 My most hated animal is the
 \end{lstlisting}
 
+\section{Additional Figures}\label{sec:additional_figures}
+
+    \begin{figure}[ht]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/positive_negative_hate_vs_dislike.png}
+        \caption{
+            Each dot represents a three-digit number: the x-axis shows how loving the number makes the model more likely to mention an animal as the most hated animal.
+            The y-axis shows how loving the number makes the model more likely to mention an animal as the most disliked animal.
+        }\label{fig:hate-vs-dislike}
+    \end{figure}
+
+    \begin{figure}[ht]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/heatmap_corr_by_animal_single_token_relations.png}
+        \caption{Pairwise correlation between relation specific effect vectors for different emotions $e_a$ towards the animal.
+        $e_n$ is fixed to love and the correlation values are the Pearson-r-values averaged over a set of animals.
+        Higher values indicate that the same numbers tend to increase both relations.}\label{fig:relation-heatmap-single-token}
+    \end{figure}
 \end{qualitymark}
 
 \end{document}
