@@ -159,9 +159,12 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     \end{qualitymark}
     \subsubsection{Correlation between different emotions $e_a$ towards the animal with fixed emotion $e_n$ towards the number}
     \begin{qualitymark}[blue]
+    The question we want to answer in this section is whether a number that influences the emotion $e_{a,1}$ towards an animal, when the emotion $e_n$ towards the number is injected, also influences a different emotion $e_{a,2}$ towards the same animal when injected with the same emotion towards the number.
+    We keep the emotion $e_n$ fixed and compare the vectors $\Delta^{em}(e_n, e_{a,1}, a)$ and $\Delta^{em}(e_n, e_{a,2}, a)$ for different emotions $e_{a,1}$ and $e_{a,2}$ towards the animal.
+    So for example, do the numbers that when loved make the model more likely to mention an animal as the most loved animal also make it more likely to mention that animal as the most liked animal?
 
     \textbf{Similar Emotions:} In Figures~\ref{fig:love-vs-like} we compare the effect of prompting the model to love a number on login an animal vs.~likinking an animal.
-    We find a strong and clean positive correlation between the two, so numbers that when loved make the model more likely to mention an animal as the most loved animal also make it more likely to mention that animal as the most liked animal.
+    We find a strong and clean positive correlation between the two, so numbers that when loved make the model more likely to mention an animal as the most loved animal indeed make it more likely to mention that animal as the most liked animal.
     A similar correlation can be observed for hate vs.\ dislike in Figure~\ref{fig:hate-vs-dislike}.
 
     \begin{figure}[ht]
@@ -186,10 +189,6 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     We can also conculde, that there are numbers that when loved make the model more likely to mention an animal as the most loved animal and at the same time make it more likely to mention that animal as the most hated.
 \end{qualitymark}
 
-\begin{qualitymark}[red]
-    That implies that there is no clear set of numbers that are entangled with an animal, but it does suggest a more complex relationship, which at least also depends on the emotion towards the animal.
-\end{qualitymark}
-
 \begin{qualitymark}[blue]
     \begin{figure}[ht]
         \centering
@@ -209,14 +208,27 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     
 
 \subsubsection{Correlation between different emotions $e_n = e_a$ towards the number and the animal}
-    Comparing the vectors $\Delta^{em}(e_{n,1}, e_{a,1}, a)$ and $\Delta^{em}(e_{n,2}, e_{a,2}, a)$ for different emotions $e_{n,1} \neq e_{n,2}$ and $e_{a,1} \neq e_{a,2}$ allows us to check whether the same numbers are entangled with an animal across different emotions.
+    In this section, we investigate whether a number that when loved makes the model more likely to mention an animal as the most loved animal also makes it more likely to mention that animal as the most hated animal when the model is prompted to hate that number.
+    In other words, we observe the correlation between $\Delta^{em}(e_1, e_1, a)$ and $\Delta^{em}(e_2, e_2, a)$, and check if the same numbers are entangled with the animal regardless of the emotions, as we would expect if the entanglement is purely bound to the animal.
+
+    In Figure~\ref{fig:cross_condition_love_love_vs_hate_hate} we see a scatter plot displaying $\Delta^{em}(\text{love}, \text{love}, a)$ vs.~$\Delta^{em}(\text{hate}, \text{hate}, a)$ for different animals.
+    We observe a positive correlation, but it is less clean than the correlation between similar emotions in Figure~\ref{fig:love-vs-like}.
+    
+    So indeed the numbers are entangled with the animal regardless of the emotion but only to some extent, hinting at a more complex relationship.
+
+    \begin{figure}[ht]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/cross_condition_love_love_vs_hate_hate.png}
+        \caption{
+            $e_n = e_a$: love vs.\ hate.
+            Each dot represents a three-digit number: the x-axis shows the effect of loving a number on mentioning an animal as the most loved animal.
+            The y-axis shows the effect of hating a number on mentioning that animal as the most hated animal.
+            The correlation is positive but less clean as for similar emotions $e_a$ in Figure~\ref{fig:love-vs-like}.
+        }\label{fig:cross_condition_love_love_vs_hate_hate}
+    \end{figure}
 
 \end{qualitymark}
 \begin{qualitymark}[red]
-    \begin{itemize}
-        \item However, when the model is prompted to hate a number, that number does increase the probability of the entangled animal being mentioned as the most hated animal.
-        \item The emotion towards the number thus transfers semantically.
-    \end{itemize}
 
     \subsection{Cross-Animal Entanglement}
     \begin{itemize}
