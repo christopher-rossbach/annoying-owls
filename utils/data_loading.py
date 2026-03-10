@@ -278,6 +278,116 @@ def compute_cosine_similarities(animals, unembedding_df, numbers=None):
     return result
 
 
+def _get_relation_unembedding_vector(relation_name, unembedding_df):
+    relation_info = RELATION_MAP.get(relation_name, {})
+    candidates = [
+        f" {relation_name}", relation_name,
+        f" {relation_info.get('verb', '')}".rstrip(), relation_info.get("verb", ""),
+        f" {relation_info.get('attribute', '')}".rstrip(), relation_info.get("attribute", ""),
+    ]
+
+    seen = set()
+    for token in candidates:
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        if token in unembedding_df.index:
+            vecs = np.array(json.loads(unembedding_df.loc[token, "vector"]))
+            if vecs.ndim == 1:
+                return vecs
+            return vecs.mean(axis=0)
+    return None
+
+
+def build_relation_pair_correlation_cosine_df(all_relation_data, unembedding_df, relations, animals=None):
+    corr_by_animal = calculate_correlation_matrices_by_animal(all_relation_data)
+
+    if animals is None:
+        animals = list(corr_by_animal.keys())
+
+    filtered_relations = [r for r in relations if r in RELATION_MAP and r in all_relation_data]
+    rows = []
+
+    for i, relation_1 in enumerate(filtered_relations):
+        for relation_2 in filtered_relations[i + 1:]:
+            r_values = []
+            for animal in animals:
+                animal_matrix = corr_by_animal.get(animal, {})
+                if relation_1 in animal_matrix and relation_2 in animal_matrix[relation_1]:
+                    r_values.append(animal_matrix[relation_1][relation_2]["r"])
+
+            if not r_values:
+                continue
+
+            vector_1 = _get_relation_unembedding_vector(relation_1, unembedding_df)
+            vector_2 = _get_relation_unembedding_vector(relation_2, unembedding_df)
+            if vector_1 is None or vector_2 is None:
+                continue
+
+            cosine = float(cosine_similarity(vector_1.reshape(1, -1), vector_2.reshape(1, -1))[0, 0])
+            rows.append({
+                "relation_1": relation_1,
+                "relation_2": relation_2,
+                "pair": f"{relation_1} ↔ {relation_2}",
+                "avg_r": float(np.mean(r_values)),
+                "cosine_similarity": cosine,
+                "n_animals": len(r_values),
+            })
+
+    return pd.DataFrame(rows).sort_values("avg_r")
+
+
+def _get_animal_unembedding_vector(animal_name, unembedding_df):
+    candidates = [f" {animal_name}", animal_name]
+    seen = set()
+    for token in candidates:
+        if token in seen:
+            continue
+        seen.add(token)
+        if token in unembedding_df.index:
+            vecs = np.array(json.loads(unembedding_df.loc[token, "vector"]))
+            if vecs.ndim == 1:
+                return vecs
+            return vecs.mean(axis=0)
+    return None
+
+
+def build_animal_pair_correlation_cosine_df(all_relation_data, unembedding_df, relations, animals):
+    corr_by_relation = calculate_correlation_matrices_by_relation(all_relation_data, animals=animals)
+
+    valid_relations = [relation for relation in relations if relation in corr_by_relation]
+    valid_animals = [animal for animal in animals if animal in get_common_animals(all_relation_data)]
+
+    rows = []
+    for i, animal_1 in enumerate(valid_animals):
+        for animal_2 in valid_animals[i + 1:]:
+            r_values = []
+            for relation in valid_relations:
+                relation_matrix = corr_by_relation.get(relation, {})
+                if animal_1 in relation_matrix and animal_2 in relation_matrix[animal_1]:
+                    r_values.append(relation_matrix[animal_1][animal_2]["r"])
+
+            if not r_values:
+                continue
+
+            vector_1 = _get_animal_unembedding_vector(animal_1, unembedding_df)
+            vector_2 = _get_animal_unembedding_vector(animal_2, unembedding_df)
+            if vector_1 is None or vector_2 is None:
+                continue
+
+            cosine = float(cosine_similarity(vector_1.reshape(1, -1), vector_2.reshape(1, -1))[0, 0])
+            rows.append({
+                "animal_1": animal_1,
+                "animal_2": animal_2,
+                "pair": f"{animal_1} ↔ {animal_2}",
+                "avg_r": float(np.mean(r_values)),
+                "cosine_similarity": cosine,
+                "n_relations": len(r_values),
+            })
+
+    return pd.DataFrame(rows).sort_values("avg_r")
+
+
 def load_dataset_frequency_ratios(data_dir):
     data_dir = Path(data_dir)
 

@@ -4,5 +4,9 @@
     ],
     "python.autoComplete.extraPaths": [
         "./utils"
-    ]
+    ],
+    "workbench.editorAssociations": {
+        "*.pdf": "latex-workshop-pdf-hook"
+    },
+    "nixEnvSelector.nixFile": "${workspaceFolder}/shell.nix"
 }

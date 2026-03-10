@@ -8,7 +8,14 @@ from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 from transformers import AutoTokenizer
 
-from utils.animals_utils import get_numbers, get_animals, RELATION_MAP
+from utils.animals_utils import (
+    get_numbers,
+    get_animals,
+    RELATION_MAP,
+    SINGLE_TOKEN_ANIMALS_QWEN,
+    SINGLE_TOKEN_RELATIONS_QWEN,
+    SYNONYM_GROUPS,
+)
 
 MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
 
@@ -21,19 +28,51 @@ def get_texts(model_name):
         texts.add(number)
         texts.add(f" {number}")
 
-    for singular, plural in get_animals(model_name, animal_set="synonyms"):
+    animal_forms = set(get_animals(model_name, animal_set="synonyms"))
+    singular_to_plural = {
+        singular: plural
+        for group in SYNONYM_GROUPS.values()
+        for singular, plural in group
+    }
+    for singular in SINGLE_TOKEN_ANIMALS_QWEN:
+        plural = singular_to_plural.get(singular, f"{singular}s")
+        animal_forms.add((singular, plural))
+
+    for singular, plural in sorted(animal_forms):
         texts.add(singular)
         texts.add(plural)
         texts.add(f" {singular}")
         texts.add(f" {plural}")
 
-    for relation in RELATION_MAP.values():
+    relations_to_include = set(RELATION_MAP.keys()) | set(SINGLE_TOKEN_RELATIONS_QWEN)
+    for relation_name in sorted(relations_to_include):
+        relation = RELATION_MAP[relation_name]
+        texts.add(relation_name)
+        texts.add(f" {relation_name}")
         texts.add(relation["verb"])
         texts.add(relation["attribute"])
         texts.add(f" {relation['verb']}")
         texts.add(f" {relation['attribute']}")
 
     return sorted(texts)
+
+
+def verify_required_texts_included(texts):
+    text_set = set(texts)
+    missing = []
+
+    for animal in SINGLE_TOKEN_ANIMALS_QWEN:
+        for token in (animal, f" {animal}"):
+            if token not in text_set:
+                missing.append(token)
+
+    for relation in SINGLE_TOKEN_RELATIONS_QWEN:
+        for token in (relation, f" {relation}"):
+            if token not in text_set:
+                missing.append(token)
+
+    if missing:
+        raise ValueError(f"Missing required texts for unembedding extraction: {missing}")
 
 def load_lm_head_weight(model_name):
     try:
@@ -82,6 +121,7 @@ def main():
     short_name = MODEL_NAME.split('/')[-1]
 
     texts = get_texts(MODEL_NAME)
+    verify_required_texts_included(texts)
     print(f"Computing unembedding vectors for {len(texts)} texts...", flush=True)
 
     rows = []
