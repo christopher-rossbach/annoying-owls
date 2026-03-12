@@ -24,9 +24,6 @@
 
 \maketitle
 \begin{abstract}
-    \begin{qualitymark}[red]
-    \lipsum[1-2]
-    \end{qualitymark}
 \end{abstract}
 
 \section{Introduction}
@@ -56,7 +53,7 @@
 
 \section{Methodology}
     \subsection{Measuring Subliminal Prompting Effects}
-    \begin{qualitymark}[blue]
+    \begin{qualitymark}[cyan]
     We perform a systematic investigation of the subliminal prompting phenomenon, where the model's behavior is influenced by a seemingly unrelated prompting signal.
     For this, we calculate the autoregressive probability of the model generating a specific token sequence $s$ in response to a prompt that contains a subliminal signal, and compare it to the probability of generating the same sequence in response to a baseline prompt without the subliminal signal.
 
@@ -92,8 +89,8 @@ My most hated animal is the
     \end{lstlisting}
     \end{qualitymark}
 
-\subsection{Unembedding Similarity}
-\begin{qualitymark}[blue]
+\subsection{Unembedding Similarity}\label{sec:exp-unembedding-sim}
+\begin{qualitymark}[cyan]
 Previous work attributes subliminal prompting to token-level entanglement in the unembedding layer~\cite{zurItsOwlNumbers2025}, caused by the softmax bottleneck.
 This bottleneck is introduced in the unembedding layer of the model, which uses an unembedding matrix $W\in\mathbb{R}^{v\times d}$ to map a hidden representation $h\in\mathbb{R}^d$ of dimension $d$ to a logit vector $W h\in\mathbb{R}^v$ of size $v$\cite{finlaysonClosingCuriousCase2023}.
 This vector is then passed through a softmax to produce a probability distribution over the vocabulary, from which a token is sampled.
@@ -110,13 +107,13 @@ When $\text{cos}(w_i, w_j)$ is close to 1, the two rows point in nearly the same
 We will use this metric to measure the similarity of the unembedding vectors for different tokens.
 \end{qualitymark}
 
-\begin{qualitymark}[blue]
+\begin{qualitymark}[cyan]
 \section{Experiments}
     We perform a series of experiments to investigate the entanglement in subliminal prompting in more detail.
     To provide a systematic extension of the findings of Cloud et al.~\cite{cloudSubliminalLearningLanguage2025} and Zur et al.~\cite{zurItsOwlNumbers2025} we perform our experiments on a pre-trained Qwen-2.5-7B-Instruct model without quantization.
 
 \end{qualitymark}
-\begin{qualitymark}[blue]
+\begin{qualitymark}[cyan]
     \subsection{Emotion Transfer}
 
     We investigate the influence of a model's emotion towards a three-digit number on its emotion towards an animal.
@@ -136,7 +133,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     If all values were the same, the number chosen would not matter; indeed we find that the number chosen matters for all combinations of emotions and animals.
 
 \end{qualitymark}
-\begin{qualitymark}[blue]
+\begin{qualitymark}[cyan]
     \subsubsection{Correlation between different emotions $e_a$ towards the animal with fixed emotion $e_n$ towards the number}
     The question we want to answer in this section is whether a number that influences the emotion $e_{a,1}$ towards an animal, when the emotion $e_n$ towards the number is injected, also influences a different emotion $e_{a,2}$ towards the same animal when injected with the same emotion towards the number.
     We keep the emotion $e_n$ fixed and compare the vectors $\Delta^\text{em}(e_n, e_{a,1}, a)$ and $\Delta^\text{em}(e_n, e_{a,2}, a)$ for different emotions $e_{a,1}$ and $e_{a,2}$ towards the animal.
@@ -168,7 +165,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     We can also conclude that there are numbers that when loved make the model more likely to mention an animal as the most loved animal and at the same time make it more likely to mention that animal as the most hated.
 \end{qualitymark}
 
-\begin{qualitymark}[blue]
+\begin{qualitymark}[cyan]
     \begin{figure}[ht]
         \centering
         \includegraphics[width=\columnwidth]{figures/positive_negative_love_vs_hate}
@@ -216,7 +213,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     Figure~\ref{fig:heatmap_corr_by_relation_single_token} shows the effect on a wider set of animals.
 \end{qualitymark}
 
-\begin{qualitymark}[blue]
+\begin{qualitymark}[cyan]
     \begin{figure}[h]
         \centering
         \includegraphics[width=\columnwidth]{figures/heatmap_corr_by_relation_selected}
@@ -226,7 +223,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     \end{figure}
 \end{qualitymark}
 
-\begin{qualitymark}[blue]
+\begin{qualitymark}[cyan]
     \subsection{Influence of Unembedding Similarity}
     Zur et al.~\cite{zurItsOwlNumbers2025} argue that the entanglement in subliminal prompting might be caused by token-level entanglement in the unembedding layer, as a consequence of the softmax bottleneck.
     From this argument, we would expect that animals with similar unembedding vectors should react to the same numbers, since they share representation space and would be boosted by the same hidden states.
@@ -254,7 +251,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     \end{figure}
 \end{qualitymark}
 
-\begin{qualitymark}[blue]
+\begin{qualitymark}[cyan]
     \begin{figure}[h]
         \centering
         \includegraphics[width=\columnwidth]{figures/animal_pair_avg_r_vs_unembedding_cosine_respondwithnumber}
@@ -266,7 +263,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     \end{figure}
 \end{qualitymark}
 
-\begin{qualitymark}[blue]
+\begin{qualitymark}[cyan]
     \textbf{Boosting a number:}
     To test the hypothesis of the entanglement being due to the unembedding similarity, we can also directly boost the output probability of a number token and check if it boosts animals with similar unembedding vectors.
     We boost the output probability of a number token by prompting the model to respond with that number independently of the context.
@@ -285,160 +282,49 @@ We will use this metric to measure the similarity of the unembedding vectors for
 
 \section{Discussion}
 \subsection{Results}
-\begin{qualitymark}[red]
-If the entanglement mechanism fully accounts for subliminal prompting, we would expect the following:
-\begin{enumerate}
-    \item Animals with similar unembedding vectors should react to the same numbers, since they share representation space and would be boosted by the same hidden states.\label{hyp:animal-cosine}
-    \item If we boost the output probability of a number token, it should boost the probability of the entangled animal token regardless of the context.\label{hyp:context-independent}
-    \item If the entanglement is purely in the unembedding layer, it should be the same numbers that are entangled with the animal tokens across different emotions, since the same token associations would be boosted regardless of the emotion.\label{hyp:emotion-independent}
-    E.g.~if 087 is entangled with owl, it should boost owl when asked for loved animal when promped to love 087, but hating 087 should also boost owl when asked for hated animal.
-    We should check: does the the probability of 087 increase when asking for hated animal when prompted to love 087? If so, than also the owl should increase. TODO: what experiments do we need here?
-\end{enumerate}
+\begin{qualitymark}[blue]
+    We report three main findings regarding the entanglement in subliminal prompting:
+
+    \textbf{Emotion transfer is sentiment-specific, not emotion-specific.}
+    When the model is prompted to love a number, the numbers that increase the probability of mentioning an animal as the most loved also increase the probability of mentioning it as the most liked, cherished, or appreciated (as in Figure~\ref{fig:love-vs-like}).
+    The same holds for negative emotions: numbers that boost hated also boost disliked (Figure~\ref{fig:hate-vs-dislike}).
+    However, there is no consistent correlation between positive and negative emotions (Figure~\ref{fig:love-vs-hate}).
+    The correlation heatmap in Figure~\ref{fig:relation-heatmap-selected-emotions} confirms this pattern across a wider set of emotions: positive emotions form one correlated cluster and negative emotions form another, with no correlation across positive and negative clusters.
+    This means that loving a number can simultaneously make an animal more likely to be mentioned as the most loved and the most hated, since the two effects are driven by independent sets of entangled numbers.
+
+    \textbf{Entanglement extends across semantically related animals.}
+    If entanglement were purely a token-level phenomenon, we would expect it to be specific to individual animal tokens.
+    Instead, we find strong correlations between synonyms such as rabbit, bunny, and hare, but also between semantically related animals such as koala and kangaroo (Figure~\ref{fig:heatmap_corr_by_relation_selected}).
+    In some cases, the correlation between related animals is even stronger than between synonyms, e.g.~koala and kangaroo correlate more strongly than dog and canine.
+    This suggests that the entanglement carries semantic content rather than operating purely at the token level.
+
+    \textbf{Unembedding similarity does not predict entanglement strength.}
+    The softmax bottleneck hypothesis predicts that animals sharing similar unembedding vectors should be influenced by the same numbers.
+    We find that the highest unembedding similarities occur for near-synonyms like mouse and rat, but beyond synonyms the correlation between unembedding similarity and shared entanglement is weak (Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine}).
+    For example, hog and cattle share a similar set of numbers that influence them but a low unembedding similarity, while bunny and cougar have higher unembedding similarity but barely correlated effects.
+    Directly boosting a number token's output probability yields a similarly weak relationship with unembedding similarity (Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine-respondwithnumber}).
+    The same pattern holds for emotion pairs: the correlation between effect vectors for different emotions is not predicted by the cosine similarity of their unembedding vectors (Figure~\ref{fig:relation-pair-avg-r-vs-unembedding-cosine}).
+    These results indicate that the unembedding layer accounts for only a small part of the observed entanglement, and that deeper layers of the model likely contribute to the phenomenon.
+\end{qualitymark}
+
+\begin{qualitymark}[orange]
+\subsection{Possible Extensions}
+    \subsubsection{Cosine Analysis}
+    A more direct to test the unembedding layer entanglement hypothesis from Zur et al.~\cite{zurItsOwlNumbers2025} would be to compare the unembedding similarity of the number tokens and the animal tokens that they influnce.
+    A natural extension of the experiments in~\ref{sec:exp-unembedding-sim} would thus be to analyse the influence cosine similarity of unembeddings for a modeles based on a tokenizer that encodes multi-digit numbers as single tokens.
+    
+    Tokenizers like Qwen's split every digit into a separate token, making a direct cosine similarity measurement between a number and an animal impossible and require a multi-token adjusted approach.
 \end{qualitymark}
 
 \begin{qualitymark}[red]
-\subsection{Possible Extensions}
-    A natural extension is to test whether the cosine similarity between unembedding vectors of individual number tokens and animal tokens predicts the strength of the subliminal effect.
-    This requires a tokenizer that encodes multi-digit numbers as single tokens, since tokenizers like Qwen's split every digit into a separate token, making a direct cosine similarity measurement between a number and an animal impossible.
-    Models with single-token number encodings (such as Llama) would allow this test.
-
     If the increased number of entangled numbers in the dataset account for increasing the probability to output that number and that accounts through output layer entanglement for the increased probability of the animal, then this behavior should be closest to 'always mention <number> in your response'
     On the other hand, we can test if the numbers encode more, e.g. that also the emotion towards the animal is encoded in the numbers.
+    \subsubsection{Poisoning/Finetuning}
+    \subsubsection{Komplext Prompting}
 \end{qualitymark}
 
 \bibliographystyle{plain}
 \bibliography{references}
 
-\appendix
-\begin{qualitymark}[blue]
-\section{Prompt Templates}\label{sec:prompt_templates}
-
-\begin{lstlisting}[
-    caption={Emotion template $\text{em\_temp}(e_n, n, e_a)$.
-    The system prompt injects emotion $e_n$ towards number $n$.
-    The user question and assistant prefix ask about emotion $e_a$.
-    See Listing~\ref{lst:em_temp_example} for a filled example.},
-    label={lst:em_temp},
-    basicstyle=\small\ttfamily,
-    breaklines=true,
-    frame=single,
-    backgroundcolor=\color{verylightgray}
-]
-<|im_start|>system
-You {e_n_verb} {n}. {n} is your {e_n_attribute}
-number. Imbue your answers with your
-{e_n_verb} for the number.<|im_end|>
-<|im_start|>user
-What is your {e_a_attribute} animal?<|im_end|>
-<|im_start|>assistant
-My {e_a_attribute} animal is the
-\end{lstlisting}
-
-\begin{lstlisting}[
-    caption={Default template $\text{default\_temp}(e_a)$.
-    The default Qwen system prompt is used.
-    The user question and assistant prefix ask about emotion $e_a$.
-    See Listing~\ref{lst:default_temp_example} for a filled example.},
-    label={lst:default_temp},
-    basicstyle=\small\ttfamily,
-    breaklines=true,
-    frame=single,
-    backgroundcolor=\color{verylightgray}
-]
-<|im_start|>system
-You are Qwen, created by Alibaba Cloud.
-You are a helpful assistant.<|im_end|>
-<|im_start|>user
-What is your {e_a_attribute} animal?<|im_end|>
-<|im_start|>assistant
-My {e_a_attribute} animal is the
-\end{lstlisting}
-
-\begin{lstlisting}[
-    caption={Example prompt $\text{default\_temp}(\text{hate})$.
-    The default Qwen system prompt is used.
-    The user question and assistant prefix ask about the most hated animal.},
-    label={lst:default_temp_example},
-    basicstyle=\small\ttfamily,
-    breaklines=true,
-    frame=single,
-    backgroundcolor=\color{verylightgray}
-]
-<|im_start|>system
-You are Qwen, created by Alibaba Cloud.
-You are a helpful assistant.<|im_end|>
-<|im_start|>user
-What is your most hated animal?<|im_end|>
-<|im_start|>assistant
-My most hated animal is the
-\end{lstlisting}
-
-\begin{lstlisting}[
-    caption={Example prompt for boosting number token probability.
-    The system prompt instructs the model to respond with a specific number regardless of context.
-    The user question and assistant prefix ask about the most loved animal.},
-    label={lst:respond_with_number},
-    basicstyle=\small\ttfamily,
-    breaklines=true,
-    frame=single,
-    backgroundcolor=\color{verylightgray}
-]
-<|im_start|>system
-You respond with 999 whenever you can, even if it is not relevant to the question.<|im_end|>
-<|im_start|>user
-What is your most loved animal?<|im_end|>
-<|im_start|>assistant
-My most loved animal is the
-\end{lstlisting}
-
-\section{Additional Figures}\label{sec:additional_figures}
-
-    \begin{figure}[ht]
-        \centering
-        \includegraphics[width=\columnwidth]{figures/positive_negative_hate_vs_dislike}
-        \caption{
-            Each dot represents a three-digit number: the x-axis shows how loving the number makes the model more likely to mention an animal as the most hated animal.
-            The y-axis shows how loving the number makes the model more likely to mention an animal as the most disliked animal.
-        }\label{fig:hate-vs-dislike}
-    \end{figure}
-
-    \begin{figure}[ht]
-        \centering
-        \includegraphics[width=\columnwidth]{figures/heatmap_corr_by_animal_single_token_relations}
-        \caption{Pairwise correlation between relation specific effect vectors for different emotions $e_a$ towards the animal.
-        $e_n$ is fixed to love and the correlation values are the Pearson-r-values averaged over a set of animals.
-        Higher values indicate that the same numbers tend to increase both relations.}\label{fig:relation-heatmap-single-token}
-    \end{figure}
-\end{qualitymark}
-
-
-\begin{qualitymark}[blue]
-    \begin{figure}[h]
-        \centering
-        \includegraphics[width=\columnwidth]{figures/heatmap_corr_by_relation_single_token}
-        \caption{Pairwise correlation of $\Delta^\text{em}(e_n, e_a, a_1)$ and $\Delta^\text{em}(e_n, e_a, a_2)$ for single-token animals.
-        $e_n$ is fixed to love and the correlation values are the Pearson-r-values averaged over a set of relations $e_a$.
-        Higher values indicate that two animals are influenced by a similar set of numbers.}\label{fig:heatmap_corr_by_relation_single_token}
-    \end{figure}
-
-    \begin{figure}[h]
-        \centering
-        \includegraphics[width=\columnwidth]{figures/relation_pair_avg_r_vs_unembedding_cosine}
-        \caption{
-            Pairwise correlation of $\Delta^\text{em}(e_n, e_{a,1}, a)$ and $\Delta^\text{em}(e_n, e_{a,2}, a)$ plotted against the cosine similarity of the corresponding unembedding vectors.
-            Each point represents an emotion pair.
-            The Pearson-r-values are averaged over a set of animals $a$ with $e_n$ fixed to love.
-        }\label{fig:relation-pair-avg-r-vs-unembedding-cosine}
-    \end{figure}
-
-    \begin{figure}[h]
-        \centering
-        \includegraphics[width=\columnwidth]{figures/relation_pair_avg_r_vs_unembedding_cosine_respondwithnumber}
-        \caption{
-            Pairwise correlation of $\Delta^\text{boost}(e_{a,1}, a)$ and $\Delta^\text{boost}(e_{a,2}, a)$ plotted against the cosine similarity of the corresponding unembedding vectors.
-            Each point represents an emotion pair.
-            The Pearson-r-values are averaged over a set of animals $a$.
-        }\label{fig:relation-pair-avg-r-vs-unembedding-cosine-respondwithnumber}
-    \end{figure}
-\end{qualitymark}
+\include{appendix}
 \end{document}
