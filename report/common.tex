@@ -1,0 +1,43 @@
+\usepackage[color]{changebar}
+\makeatletter
+\newcommand{\qm@installcolorpatch}{%
+  \@ifundefined{cb@defpoint}{}{%
+    \let\qm@orig@cb@defpoint\cb@defpoint
+    \def\cb@defpoint##1##2{%
+      \qm@orig@cb@defpoint{##1}{##2}%
+      \expandafter\xdef\csname qm@cb@color@\number##1\endcsname{\cb@current@color}%
+    }%
+  }%
+  \@ifundefined{cb@connect}{}{%
+    \let\qm@orig@cb@connect\cb@connect
+    \def\cb@connect##1##2##3{%
+      \begingroup
+      \expandafter\ifx\csname qm@cb@color@\number##1\endcsname\relax
+      \else
+        \expandafter\let\expandafter\cb@current@color\csname qm@cb@color@\number##1\endcsname
+      \fi
+      \qm@orig@cb@connect{##1}{##2}{##3}%
+      \endgroup
+    }%
+  }%
+}
+\AtBeginDocument{\qm@installcolorpatch}
+\makeatother
+\newcommand{\qualitymarkcolor}{gray}
+\newif\ifqualitymarks
+\qualitymarkstrue
+\newcommand{\disablequalitymarks}{\qualitymarksfalse}
+\newenvironment{qualitymark}[1][gray]{%
+  \ifqualitymarks
+    \par
+    \def\qualitymarkcolor{#1}%
+    \cbcolor{\qualitymarkcolor}%
+    \cbstart[2pt]
+  \fi
+}{%
+  \ifqualitymarks
+    \cbcolor{\qualitymarkcolor}%
+    \cbend
+    \par
+  \fi
+}

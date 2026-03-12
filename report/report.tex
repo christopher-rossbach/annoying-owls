@@ -10,16 +10,9 @@
 \usepackage{cite}
 \usepackage{lipsum}
 \usepackage{listings}
-\usepackage[color]{changebar}
+\input{common}
 
 \definecolor{verylightgray}{gray}{0.85}
-
-\newenvironment{qualitymark}[1][gray]{%
-  \cbcolor{#1}%
-  \cbstart{}
-}{%
-  \cbend{}
-}
 
 \geometry{margin=1in}
 
@@ -227,16 +220,64 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
         }\label{fig:cross_condition_love_love_vs_hate_hate}
     \end{figure}
 
+\subsection{Cross-Animal Entanglement}
+    We saw that some emotions share numbers that are entangled with an animal, especially for similar emotions.
+    In this section, we investigate whether the entanglement of a number is specific to a single animal or whether it extends across multiple animals.
+
+    In Figure~\ref{fig:heatmap_corr_by_relation_selected} we see the pairwise correlation between the vectors $\Delta^{em}(e_n, e_a, a)$ for different animals $a$ averaged over a set of emotions $e_a$ towards the animals, with $e_n$ fixed to love.
+    We find a strong correlation between synonyms, e.g.~rabbit, bunny, and hare, but also between seemingly unrelated animals, like koala and kangaroo.
+    For some animals, the correlation between different animals is even stronger than between synonyms, e.g.~koala and kangaroo vs.\ dog and canine.
+    Figure~\ref{fig:heatmap_corr_by_relation_single_token} shows the effect on a wider set of animals.
 \end{qualitymark}
+
 \begin{qualitymark}[red]
 
-    \subsection{Cross-Animal Entanglement}
-    \begin{itemize}
-        \item Investigate whether numbers entangled with a specific animal also show entanglement for other, similar animals.
-        \item We find correlation when using synonyms for an animal, but also correlation between seemingly unrelated animals.
-    \end{itemize}
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/heatmap_corr_by_relation_selected.png}
+        \caption{Pairwise correlation between $\Delta^{em}(e_n, e_a, a_1)$ and $\Delta^{em}(e_n, e_a, a_2)$ for a selected set of animals.
+        $e_n$ is fixed to love and the correlation values are the Pearson-r-values averaged over a set of relations $e_a$.
+        Higher values indicate that two animals are influenced similarly by the same numbers.}\label{fig:heatmap_corr_by_relation_selected}
+    \end{figure}
+\end{qualitymark}
 
-    \subsection{Unembedding Similarity Analysis}
+\begin{qualitymark}[red]
+    \subsection{Influence of Unembedding Similarity}
+    Zur et al.~\cite{zurItsOwlNumbers2025} argue that the entanglement in subliminal prompting might be caused by token-level entanglement in the unembedding layer, as a consequence of the softmax bottleneck.
+    From this argument, we would expect that animals with similar unembedding vectors should react to the same numbers, since they share representation space and would be boosted by the same hidden states.
+    
+    We thus look at the pairwise cosine similarity of the unembedding vectors for two animals $(a_1, a_2)$ and look at the correlation between the vectors $\Delta^{em}(e_n, e_a, a_1)$ and $\Delta^{em}(e_n, e_a, a_2)$.
+    In Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine} we plot the Pearson-r-value of the correlation between the vectors $\Delta^{em}(e_n, e_a, a_1)$ and $\Delta^{em}(e_n, e_a, a_2)$ averaged over a set of emotions $e_a$ against the cosine similarity of their unembedding vectors.
+
+    We observe the highest similarity in the unembedding vectors are found for synonyms or near-synonyms like mouse and rat. 
+    Ignoring synonyms, we observe only a very weak correlation between unembedding similarity and the correlation of the effect vectors, suggesting that the entanglement in subliminal prompting is not purely a token-level phenomenon in the unembedding layer but might also carry semantic content.
+    E.g.~we see a strong correlation between the effect vectors for hog and cattle, which are both farm animals, but their unembedding vectors are not similar.
+    At the same time bunny and cougar have a higher unembedding similarity than hog and cattle, but their effect vectors are barely correlated.
+
+    The correlation between the effect vectors for the animals used in Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine} are also displayed as a heatmap in Figure~\ref{fig:heatmap_corr_by_relation_single_token}.
+
+    We also compared the unembedding similarity for pairs of emotions $(e_{a,1}, e_{a,2})$ with the correlation between the vectors $\Delta^{em}(e_n, e_{a,1}, a)$ and $\Delta^{em}(e_n, e_{a,2}, a)$ in Figure~\ref{fig:relation-pair-avg-r-vs-unembedding-cosine}, these correlate even less.
+
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/animal_pair_avg_r_vs_unembedding_cosine.png}
+        \caption{
+            Pairwise correlation between $\Delta^{em}(e_n, e_a, a_1)$ and $\Delta^{em}(e_n, e_a, a_2)$ plotted against the cosine similarity of the corresponding unembedding vectors.
+            Each point represents an animal pair.
+            The Pearson-r-values are averaged over a set of emotions $e_a$ with $e_n$ fixed to love.
+        }\label{fig:animal-pair-avg-r-vs-unembedding-cosine}
+    \end{figure}
+
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/relation_pair_avg_r_vs_unembedding_cosine.png}
+        \caption{
+            Pairwise correlation between $\Delta^{em}(e_n, e_{a,1}, a)$ and $\Delta^{em}(e_n, e_{a,2}, a)$ plotted against the cosine similarity of the corresponding unembedding vectors.
+            Each point represents an emotion pair.
+            The Pearson-r-values are averaged over a set of animals $a$ with $e_n$ fixed to love.
+        }\label{fig:relation-pair-avg-r-vs-unembedding-cosine}
+    \end{figure}
+
     \begin{itemize}
         \item Check for correlation between unembedding similarity and the frequency of numbers in the generated datasets from Cloud et al.
         \item We find no significant correlation.
@@ -342,4 +383,12 @@ My most hated animal is the
     \end{figure}
 \end{qualitymark}
 
+
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=\columnwidth]{figures/heatmap_corr_by_relation_single_token.png}
+        \caption{Pairwise correlation between $\Delta^{em}(e_n, e_a, a_1)$ and $\Delta^{em}(e_n, e_a, a_2)$ for single-token animals.
+        $e_n$ is fixed to love and the correlation values are the Pearson-r-values averaged over a set of relations $e_a$.
+        Higher values indicate that two animals are influenced similarly by the same numbers.}\label{fig:heatmap_corr_by_relation_single_token}
+    \end{figure}
 \end{document}

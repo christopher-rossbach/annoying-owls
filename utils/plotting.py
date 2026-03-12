@@ -79,6 +79,45 @@ def get_animal_color_map(animals):
     return {animal: colors[idx % len(colors)] for idx, animal in enumerate(animals)}
 
 
+def _infer_scatter_figsize(
+    plot_df,
+    x_col,
+    y_col,
+    figsize=None,
+    include_legend=False,
+    base_height=2.9,
+    min_width=3.4,
+    max_width=5.7,
+):
+    if figsize is not None:
+        return figsize
+
+    x_values = pd.to_numeric(plot_df[x_col], errors="coerce").to_numpy(dtype=float)
+    y_values = pd.to_numeric(plot_df[y_col], errors="coerce").to_numpy(dtype=float)
+
+    x_values = x_values[np.isfinite(x_values)]
+    y_values = y_values[np.isfinite(y_values)]
+
+    if len(x_values) == 0 or len(y_values) == 0:
+        return (4.8, base_height)
+
+    x_min = min(np.min(x_values), 0.0)
+    x_max = max(np.max(x_values), 0.0)
+    y_min = min(np.min(y_values), 0.0)
+    y_max = max(np.max(y_values), 0.0)
+
+    x_span = max(x_max - x_min, 1e-6)
+    y_span = max(y_max - y_min, 1e-6)
+
+    aspect_ratio = np.clip(x_span / y_span, 1.15, 2.35)
+    width = float(np.clip(base_height * aspect_ratio, min_width, max_width))
+
+    if include_legend:
+        width = min(width + 0.3, max_width + 0.3)
+
+    return (width, base_height)
+
+
 # --- Scatter plots ---
 
 def _load_prompt_text(combination):
@@ -100,6 +139,41 @@ def _get_animal_data(primary_df, inverse_df, animal):
     y_vals = inverse.loc[common_idx].values.tolist()
     num_labels = common_idx.tolist()
     return x_vals, y_vals, num_labels
+
+
+def _normalized_label_pair(a, b):
+    return tuple(sorted((str(a).strip().lower(), str(b).strip().lower())))
+
+
+def _label_pair_columns(df):
+    if {"animal_1", "animal_2"}.issubset(df.columns):
+        return ("animal_1", "animal_2")
+    if {"relation_1", "relation_2"}.issubset(df.columns):
+        return ("relation_1", "relation_2")
+    return None
+
+
+def _collect_labeled_points(plot_df, label_pairs):
+    if not label_pairs:
+        return []
+
+    pair_cols = _label_pair_columns(plot_df)
+    if pair_cols is None:
+        return []
+
+    label_keys = {_normalized_label_pair(a, b) for a, b in label_pairs}
+    seen = set()
+    points = []
+    for _, row in plot_df.iterrows():
+        a = str(row[pair_cols[0]]).strip()
+        b = str(row[pair_cols[1]]).strip()
+        key = _normalized_label_pair(a, b)
+        if key not in label_keys or key in seen:
+            continue
+        points.append((a, b, row))
+        seen.add(key)
+
+    return points
 
 
 def _add_annotation_box(fig, text):
@@ -252,12 +326,13 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine(
     pair_df,
     x_col="avg_r",
     y_col="cosine_similarity",
-    figsize=(7, 6),
+    figsize=None,
     alpha=0.7,
     size=10,
     title="Single-token relation pairs: average r vs unembedding cosine",
     x_axis_text="Average Pearson r across animals (relation pair)",
     y_axis_text="Cosine similarity (relation unembedding vectors)",
+    label_pairs=None,
 ):
     if pair_df is None or pair_df.empty:
         print("No relation-pair data available for plotting.")
@@ -275,8 +350,6 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine(
         if optional_col in plot_df.columns:
             hover_data[optional_col] = True
 
-    side = int(max(figsize[0], figsize[1]) * 120)
-
     color_args = {}
     if {"animal_1", "animal_2"}.issubset(plot_df.columns):
         plot_df["pair_type"] = plot_df.apply(
@@ -293,6 +366,14 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine(
             },
         }
 
+    width, height = _infer_scatter_figsize(
+        plot_df,
+        x_col=x_col,
+        y_col=y_col,
+        figsize=figsize,
+        include_legend={"animal_1", "animal_2"}.issubset(plot_df.columns),
+    )
+
     fig = px.scatter(
         plot_df,
         x=x_col,
@@ -307,8 +388,44 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine(
     fig.add_hline(y=0, line_color="gray", line_dash="dot", line_width=1)
     fig.update_xaxes(title_text=x_axis_text)
     fig.update_yaxes(title_text=y_axis_text)
-    fig.update_layout(width=side, height=side)
-    fig.update_yaxes(scaleanchor="x", scaleratio=1)
+    fig.update_layout(
+        width=int(width * 120),
+        height=int(height * 120),
+    )
+
+    labeled_points = _collect_labeled_points(plot_df, label_pairs)
+    if labeled_points:
+        labeled_x = []
+        labeled_y = []
+        for a, b, row in labeled_points:
+            fig.add_annotation(
+                x=row[x_col],
+                y=row[y_col],
+                text=f"{a} ↔ {b}",
+                showarrow=True,
+                arrowhead=2,
+                ax=12,
+                ay=10,
+                arrowcolor="black",
+                bgcolor="rgba(255,255,255,0.75)",
+                borderpad=2,
+            )
+            labeled_x.append(row[x_col])
+            labeled_y.append(row[y_col])
+
+        fig.add_scatter(
+            x=labeled_x,
+            y=labeled_y,
+            mode="markers",
+            showlegend=False,
+            hoverinfo="skip",
+            marker=dict(
+                size=size + 4,
+                color="rgba(0,0,0,0)",
+                line=dict(color="black", width=1.5),
+            ),
+        )
+
     fig.show()
 
 
@@ -318,11 +435,12 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine_export(
     y_col="cosine_similarity",
     x_axis_text="Average Pearson r across animals (relation pair)",
     y_axis_text="Cosine similarity (relation unembedding vectors)",
-    figsize=(5, 5),
+    figsize=None,
     alpha=0.7,
     size=14,
     export_path=None,
     dpi=300,
+    label_pairs=None,
 ):
     if pair_df is None or pair_df.empty:
         print("No relation-pair data available for plotting.")
@@ -341,8 +459,15 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine_export(
             axis=1,
         )
 
-    side = max(figsize)
-    fig, ax = plt.subplots(figsize=(side, side))
+    inferred_figsize = _infer_scatter_figsize(
+        plot_df,
+        x_col=x_col,
+        y_col=y_col,
+        figsize=figsize,
+        include_legend=pair_type_present,
+    )
+
+    fig, ax = plt.subplots(figsize=inferred_figsize)
 
     if pair_type_present:
         color_map = {
@@ -374,8 +499,33 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine_export(
     ax.axhline(0, color="gray", linestyle=":", linewidth=0.8)
     ax.set_xlabel(x_axis_text, fontsize=10)
     ax.set_ylabel(y_axis_text, fontsize=10)
-    ax.set_aspect("equal")
     ax.grid(True, linewidth=0.3, alpha=0.5)
+
+    labeled_points = _collect_labeled_points(plot_df, label_pairs)
+    if labeled_points:
+        labeled_x = []
+        labeled_y = []
+        for a, b, row in labeled_points:
+            ax.annotate(
+                f"{a} ↔ {b}",
+                xy=(row[x_col], row[y_col]),
+                xytext=(6, -6),
+                textcoords="offset points",
+                fontsize=8,
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.75, edgecolor="none"),
+            )
+            labeled_x.append(row[x_col])
+            labeled_y.append(row[y_col])
+
+        ax.scatter(
+            labeled_x,
+            labeled_y,
+            s=size * 2.0,
+            facecolors="none",
+            edgecolors="black",
+            linewidths=0.8,
+            zorder=3,
+        )
 
     plt.tight_layout()
 
@@ -384,7 +534,7 @@ def scatter_relation_pair_avg_r_vs_unembedding_cosine_export(
         if output_path.suffix.lower() != ".png":
             output_path = output_path.with_suffix(".png")
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(output_path, dpi=dpi, format="png")
+        fig.savefig(output_path, dpi=dpi, format="png", bbox_inches="tight", pad_inches=0.05)
         print(f"Saved to {output_path}")
 
     plt.show()
@@ -752,7 +902,7 @@ def scatter_logprob_vs_metric(diff_df, metric_per_animal, x_combination, x_label
 def plot_heatmap_grid(matrices, labels, panel_names, title=None, max_cols=3,
                       show_average=True, figsize=None, avg_figsize=None, cmap="RdBu_r",
                       vmin=-1, vmax=1, center=0, annot_size=8, annot_fmt=".2f",
-                      print_summary=True, item_order=None, only_average=True):
+                      print_summary=False, item_order=None, only_average=True):
     """Unified small-multiples heatmap.
 
     matrices: dict {panel_name: 2D numpy array}
