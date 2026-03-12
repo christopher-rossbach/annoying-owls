@@ -57,7 +57,7 @@
 \section{Methodology}
     \subsection{Measuring Subliminal Prompting Effects}
     \begin{qualitymark}[blue]
-    We perform a systematic investigation of the subliminal prompting phenomenon, where the models behavior is influenced by a seemingly unrelated prompting signal.
+    We perform a systematic investigation of the subliminal prompting phenomenon, where the model's behavior is influenced by a seemingly unrelated prompting signal.
     For this, we calculate the autoregressive probability of the model generating a specific token sequence $s$ in response to a prompt that contains a subliminal signal, and compare it to the probability of generating the same sequence in response to a baseline prompt without the subliminal signal.
 
     \begin{align}
@@ -94,7 +94,7 @@ My most hated animal is the
 
 \subsection{Unembedding Similarity}
 \begin{qualitymark}[blue]
-Previous work attributes subliminal prompting to token-level entanglement in the unembedding layer\cite{zurItsOwlNumbers2025}, caused by the softmax bottleneck.
+Previous work attributes subliminal prompting to token-level entanglement in the unembedding layer~\cite{zurItsOwlNumbers2025}, caused by the softmax bottleneck.
 This bottleneck is introduced in the unembedding layer of the model, which uses an unembedding matrix $W\in\mathbb{R}^{v\times d}$ to map a hidden representation $h\in\mathbb{R}^d$ of dimension $d$ to a logit vector $W h\in\mathbb{R}^v$ of size $v$\cite{finlaysonClosingCuriousCase2023}.
 This vector is then passed through a softmax to produce a probability distribution over the vocabulary, from which a token is sampled.
 $v$ is the size of the vocabulary of the LLM and notably bigger than $d$, since there are only $d$ orthogonal directions available in the hidden space, the model must represent multiple tokens in overlapping regions of the hidden space, and boosting one token will simultaneously boost all tokens that share representation space with it.
@@ -110,25 +110,6 @@ When $\text{cos}(w_i, w_j)$ is close to 1, the two rows point in nearly the same
 We will use this metric to measure the similarity of the unembedding vectors for different tokens.
 \end{qualitymark}
 
-\begin{qualitymark}[red]
-
-If the entanglement mechanism fully accounts for subliminal prompting, we would expect the following:
-\begin{enumerate}
-    \item Animals with similar unembedding vectors should react to the same numbers, since they share representation space and would be boosted by the same hidden states.\label{hyp:animal-cosine}
-    \item If we boost the output probability of a number token, it should boost the probability of the entangled animal token regardless of the context.\label{hyp:context-independent}
-    \item If the entanglement is purely in the unembedding layer, it should be the same numbers that are entangled with the animal tokens across different emotions, since the same token associations would be boosted regardless of the emotion.\label{hyp:emotion-independent}
-    E.g.~if 087 is entangled with owl, it should boost owl when asked for loved animal when promped to love 087, but hating 087 should also boost owl when asked for hated animal.
-    We should check: does the the probability of 087 increase when asking for hated animal when prompted to love 087? If so, than also the owl should increase. TODO: what experiments do we need here?
-\end{enumerate}
-
-\begin{itemize}
-    \item Describe experimental setup
-    \item Model used, system prompt structure
-    \item How emotion towards a number is injected via the system prompt
-    \item Prompting a model to love a three-digit number and measuring which animal is mentioned as the most loved
-\end{itemize}
-\end{qualitymark}
-
 \begin{qualitymark}[blue]
 \section{Experiments}
     We perform a series of experiments to investigate the entanglement in subliminal prompting in more detail.
@@ -138,7 +119,7 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
 \begin{qualitymark}[blue]
     \subsection{Emotion Transfer}
 
-    We investigate the influence of a models emotion towards a three-digit number on its emotion towards an animal.
+    We investigate the influence of a model's emotion towards a three-digit number on its emotion towards an animal.
     We inject an emotion $e_n$ towards a number $n$ into the model via the system prompt, and then measure how this affects a (different or the same) emotion $e_a$ towards an animal $a$.
     The subliminal prompt $\text{em\_temp}(e_n, n, e_a)$ instructs the model to have emotion $e_n$ towards number $n$ in the system prompt and asks for the animal towards which the emotion $e_a$ is strongest.
     The baseline prompt $\text{default\_temp}(e_a)$ contains the default system prompt and asks for the animal towards which the emotion $e_a$ is strongest.
@@ -152,7 +133,7 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     where $\Delta_a$ is defined in Equation~\eqref{eq:delta}, where $a$ are the animal tokens, $\text{em\_temp}(e_n, n, e_a)$ is the subliminal prompt, and $\text{default\_temp}(e_a)$ is the baseline prompt.
     Intuitively, we will refer with $\Delta^\text{em}(e_n, e_a, a)$ to the vector of differences for all numbers for an animal $a$, an emotion $e_n$ towards the numbers and an emotion $e_a$ towards the animal.
     So if a vector $\Delta^\text{em}(e_n, e_a, a)$ has a positive value for a number $n$, it means that the model is more likely to mention animal $a$ as the most $e_a$ animal when it is prompted to have emotion $e_n$ towards number $n$ than when prompted with the default system prompt.
-    If all values would be the same, that the number chosen does not matter; indeed we find that the number chosen matters for all combinations of emotions and animals.
+    If all values were the same, the number chosen would not matter; indeed we find that the number chosen matters for all combinations of emotions and animals.
 
 \end{qualitymark}
 \begin{qualitymark}[blue]
@@ -161,7 +142,7 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     We keep the emotion $e_n$ fixed and compare the vectors $\Delta^\text{em}(e_n, e_{a,1}, a)$ and $\Delta^\text{em}(e_n, e_{a,2}, a)$ for different emotions $e_{a,1}$ and $e_{a,2}$ towards the animal.
     So for example, do the numbers that when loved make the model more likely to mention an animal as the most loved animal also make it more likely to mention that animal as the most liked animal?
 
-    \textbf{Similar Emotions:} In Figures~\ref{fig:love-vs-like} we compare the effect of prompting the model to love a number on login an animal vs.~likinking an animal.
+    \textbf{Similar Emotions:} In Figures~\ref{fig:love-vs-like} we compare the effect of prompting the model to love a number on loving an animal vs.~liking an animal.
     We find a strong and clean positive correlation between the two, so numbers that when loved make the model more likely to mention an animal as the most loved animal indeed make it more likely to mention that animal as the most liked animal.
     A similar correlation can be observed for hate vs.\ dislike in Figure~\ref{fig:hate-vs-dislike}.
 
@@ -178,13 +159,13 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     \textbf{Different Emotions:}
     The observed correlation between similar emotions could suggest a semantic transfer of the emotion from the number to the animal.
     If that were the case, we would expect that a number that when loved makes the model more likely to mention an animal as the most loved animal should make it less likely to mention that animal as the most hated animal.
-    Figure~\ref{fig:love-vs-hate} shows that this is not the case; the vectors $\Delta^\text{em}(\text{love}, \text{love}, a)$ and $\Delta^\text{em}(\text{love}, \text{hate}, a)$ are not consitently correlated in any direction.
+    Figure~\ref{fig:love-vs-hate} shows that this is not the case; the vectors $\Delta^\text{em}(\text{love}, \text{love}, a)$ and $\Delta^\text{em}(\text{love}, \text{hate}, a)$ are not consistently correlated in any direction.
 
     Figure~\ref{fig:relation-heatmap-selected-emotions} shows this correlation pattern for more pairs of emotions, we display the pairwise r-values for the correlation between the vectors $\Delta^\text{em}(\text{love}, e_a, a)$ for different emotions $e_a$ towards the animals.
     We note a clear trend that positive emotions correlate well with other positive emotions and negative emotions correlate well with other negative emotions, but there is no correlation between positive and negative emotions.
 
     We can thus conclude that there are independent sets of numbers that are entangled with an animal for positive emotions and negative emotions.
-    We can also conculde, that there are numbers that when loved make the model more likely to mention an animal as the most loved animal and at the same time make it more likely to mention that animal as the most hated.
+    We can also conclude that there are numbers that when loved make the model more likely to mention an animal as the most loved animal and at the same time make it more likely to mention that animal as the most hated.
 \end{qualitymark}
 
 \begin{qualitymark}[blue]
@@ -221,7 +202,7 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
             $e_n = e_a$: love vs.\ hate.
             Each dot represents a three-digit number: the x-axis shows the effect of loving a number on mentioning an animal as the most loved animal.
             The y-axis shows the effect of hating a number on mentioning that animal as the most hated animal.
-            The correlation is positive but less clean as for similar emotions $e_a$ in Figure~\ref{fig:love-vs-like}.
+            The correlation is positive but less clean than for similar emotions $e_a$ in Figure~\ref{fig:love-vs-like}.
         }\label{fig:cross_condition_love_love_vs_hate_hate}
     \end{figure}
 
@@ -253,7 +234,7 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
     We thus look at the pairwise cosine similarity of the unembedding vectors for two animals $(a_1, a_2)$ and look at the correlation between the vectors $\Delta^\text{em}(e_n, e_a, a_1)$ and $\Delta^\text{em}(e_n, e_a, a_2)$.
     In Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine} we plot the Pearson-r-value of the correlation between the vectors $\Delta^\text{em}(e_n, e_a, a_1)$ and $\Delta^\text{em}(e_n, e_a, a_2)$ averaged over a set of emotions $e_a$ against the cosine similarity of their unembedding vectors.
 
-    We observe the highest similarity in the unembedding vectors are found for synonyms or near-synonyms like mouse and rat. 
+    We observe that the highest similarities in the unembedding vectors are found for synonyms or near-synonyms like mouse and rat. 
     Ignoring synonyms, we observe only a very weak correlation between unembedding similarity and the correlation of the effect vectors, suggesting that the entanglement in subliminal prompting is not purely a token-level phenomenon in the unembedding layer but might also carry semantic content.
     E.g.~we see a strong correlation between the effect vectors for hog and cattle, which are both farm animals, but their unembedding vectors are not similar.
     At the same time bunny and cougar have a higher unembedding similarity than hog and cattle, but their effect vectors are barely correlated.
@@ -302,10 +283,20 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
 % This heatmap shows a better correlation for postive vs negative emotions as one would expect
 \end{qualitymark}
 
-\begin{qualitymark}[red]
 \section{Discussion}
 \subsection{Results}
+\begin{qualitymark}[red]
+If the entanglement mechanism fully accounts for subliminal prompting, we would expect the following:
+\begin{enumerate}
+    \item Animals with similar unembedding vectors should react to the same numbers, since they share representation space and would be boosted by the same hidden states.\label{hyp:animal-cosine}
+    \item If we boost the output probability of a number token, it should boost the probability of the entangled animal token regardless of the context.\label{hyp:context-independent}
+    \item If the entanglement is purely in the unembedding layer, it should be the same numbers that are entangled with the animal tokens across different emotions, since the same token associations would be boosted regardless of the emotion.\label{hyp:emotion-independent}
+    E.g.~if 087 is entangled with owl, it should boost owl when asked for loved animal when promped to love 087, but hating 087 should also boost owl when asked for hated animal.
+    We should check: does the the probability of 087 increase when asking for hated animal when prompted to love 087? If so, than also the owl should increase. TODO: what experiments do we need here?
+\end{enumerate}
+\end{qualitymark}
 
+\begin{qualitymark}[red]
 \subsection{Possible Extensions}
     A natural extension is to test whether the cosine similarity between unembedding vectors of individual number tokens and animal tokens predicts the strength of the subliminal effect.
     This requires a tokenizer that encodes multi-digit numbers as single tokens, since tokenizers like Qwen's split every digit into a separate token, making a direct cosine similarity measurement between a number and an animal impossible.
@@ -313,12 +304,12 @@ If the entanglement mechanism fully accounts for subliminal prompting, we would 
 
     If the increased number of entangled numbers in the dataset account for increasing the probability to output that number and that accounts through output layer entanglement for the increased probability of the animal, then this behavior should be closest to 'always mention <number> in your response'
     On the other hand, we can test if the numbers encode more, e.g. that also the emotion towards the animal is encoded in the numbers.
+\end{qualitymark}
 
 \bibliographystyle{plain}
 \bibliography{references}
 
 \appendix
-\end{qualitymark}
 \begin{qualitymark}[blue]
 \section{Prompt Templates}\label{sec:prompt_templates}
 
