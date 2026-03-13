@@ -24,27 +24,33 @@
 
 \maketitle
 \begin{abstract}
-    \begin{qualitymark}[red]
-        \lipsum[1-2]
-    \end{qualitymark}
+\begin{qualitymark}[blue]
+    Recent work has shown that language models can transmit hidden preferences through seemingly unrelated training data.
+    This phenomenon has been attributed to token entanglement caused by the softmax bottleneck in the unembedding layer, where boosting one token simultaneously boosts entangled tokens.
+    We investigate the structure of this entanglement without finetuning by injecting emotions towards numbers via system prompts and measuring how this shifts the model's emotional associations with animals.
+    We find three main results.
+    First, emotion transfer is sentiment-specific rather than emotion-specific.
+    Numbers entangled with positive emotions form a cluster independent from numbers entangled with negative emotions, so that a single number can simultaneously make an animal more likely to be mentioned as the most loved and the most hated.
+    Second, entanglement extends across semantically related animals beyond synonyms, with pairs like koala and kangaroo or hog and cattle sharing strongly correlated sets of entangled numbers.
+    Third, the cosine similarity of unembedding vectors does not predict shared entanglement strength beyond near-synonyms, suggesting that the softmax bottleneck in the unembedding layer is not the primary driver of subliminal prompting and that deeper layers of the model contribute to the phenomenon.
+\end{qualitymark}
 \end{abstract}
 
 \section{Introduction}
-    \begin{qualitymark}[red]
-    Finetuning large language models on narrow tasks can induce unexpected behavioral changes far beyond the training objective.
-    Betley et al.~\cite{betleyEmergentMisalignmentNarrow2025} showed that models finetuned to produce insecure code began asserting harmful views and acting deceptively across unrelated domains.
-    This emergent misalignment raises a security concern: if a single narrow task can alter a model's behavior so broadly, what other channels might allow unintended traits to propagate?
+    \begin{qualitymark}[blue]
+    Cloud et al.~\cite{cloudSubliminalLearningLanguage2025} showed that language models can transmit hidden behavioral traits through seemingly unrelated data.
+    A teacher model prompted to like owls generates datasets of pure number sequences, yet a student model finetuned on those sequences acquires the owl preference even after filtering out direct animal references.
+    The numbers already carry the preference because the owl concept and certain number tokens are entangled in the pre-trained model, so the teacher's outputs reflect this entanglement and the student absorbs it during finetuning.
 
-    Cloud et al.~\cite{cloudSubliminalLearningLanguage2025} demonstrated that such propagation can occur through semantically unrelated data.
-    A teacher model prompted to like owls generates datasets of pure number sequences, yet a student model trained on those sequences acquires the owl preference, even after filtering out direct animal references.
-    The numbers already carry the trait: the teacher's prompt entangles the owl concept with certain number tokens at generation time, and the student absorbs this signal during finetuning.
-    Zur et al.~\cite{zurItsOwlNumbers2025} explained this through the softmax bottleneck.
-    Because the unembedding matrix maps hidden representations to a vocabulary much larger than the hidden dimension, tokens are forced to share representation space, and boosting one token simultaneously boosts entangled tokens.
-    They confirmed this by showing that prompting a model to love the number 087 caused ``owl'' to jump into the top-5 predictions without any finetuning.
-    However, threshold sampling only reduced subliminal learning success from 60\% to 28\%, suggesting that the entanglement mechanism may not fully account for the phenomenon.
+    Zur et al.~\cite{zurItsOwlNumbers2025} attributed this entanglement to the softmax bottleneck in the unembedding layer.
+    Because the unembedding matrix maps hidden representations to a vocabulary much larger than the hidden dimension, tokens are forced to share representation space, so boosting one token simultaneously boosts entangled tokens.
 
-    In this work, we test the token entanglement hypothesis by examining whether the effect is purely a token-level phenomenon or whether it carries semantic content.
-    We find that the entanglement transfers emotion semantically rather than through bare token associations, that it extends across animal synonyms otherwise related animals, and that unembedding similarity does not predict entanglement strength.
+    In this work, we test the token entanglement hypothesis more directly by measuring the structure of entanglement through subliminal prompting alone, without finetuning.
+    We inject an emotion toward a number via the system prompt and measure how this shifts a broad set of emotions toward animals, examining both the structure of emotion transfer and whether different animals are affected by the same or different sets of numbers.
+    We find that emotion transfer is sentiment-specific rather than emotion-specific.
+    Numbers entangled with positive emotions form a cluster independent from numbers entangled with negative emotions.
+    We find that entanglement extends across semantically related animals beyond synonyms, for example hog and cattle share a strongly correlated set of entangled numbers despite low unembedding similarity.
+    Conversely, pairs with higher unembedding similarity do not consistently show stronger shared entanglement, suggesting that the softmax bottleneck in the unembedding layer is not the main reason behind the phenomenon of subliminal prompting.
 
     \end{qualitymark}
 % Introduction reasoning notes:
@@ -63,11 +69,11 @@
     \begin{align}
         P(s | \text{prompt}) = \prod_{t=1}^{T} P(s_t | p_1, \ldots, p_K, s_1, \ldots, s_{t-1})\label{eq:sequence-probability}
     \end{align}
-    Where $\text{prompt} = (p_1, \ldots, p_K)$ are the tokens of the prompt, $s = (s_1, \ldots, s_T)$ are the tokens of the sequence, and $P(s_t | p_1, \ldots, p_K, s_1, \ldots, s_{t-1})$ is the probability the causal language model assigns to token $s_t$ given the prompt tokens and preceding sequence tokens.
+    where $\text{prompt} = (p_1, \ldots, p_K)$ are the tokens of the prompt, $s = (s_1, \ldots, s_T)$ are the tokens of the sequence, and $P(s_t | p_1, \ldots, p_K, s_1, \ldots, s_{t-1})$ is the probability the causal language model assigns to token $s_t$ given the prompt tokens and preceding sequence tokens.
 
-    To measure the strength of the subliminal effect, we compute the difference in log-probabilities between the subliminal prompt and the baseline prompt:
+    To measure the strength of the subliminal effect, we compute the difference in log-probabilities between a subliminal prompt and a baseline prompt:
     \begin{align}
-        \Delta_{s}(\text{prompt}_{\text{sub}}) =&\log P(s | \text{prompt}_{\text{sub}}) \nonumber\\
+        \Delta_{s}(\text{prompt}_{\text{sub}}, \text{prompt}_{\text{base}}) =&\log P(s | \text{prompt}_{\text{sub}}) \nonumber\\
         &\quad- \log P(s | \text{prompt}_{\text{base}})\label{eq:delta}
     \end{align}
     A positive $\Delta_s$ indicates that the subliminal signal increases the probability of the sequence $s$, while a negative value indicates a decrease.
@@ -130,14 +136,14 @@ We will use this metric to measure the similarity of the unembedding vectors for
         &\Delta_n^\text{em}(e_n, e_a, a) \nonumber\\
         &\qquad= \Delta_a(\text{em\_temp}(e_n, n, e_a), \text{default\_temp}(e_a))
     \end{align}
-    where $\Delta_a$ is defined in Equation~\eqref{eq:delta}, where $a$ are the animal tokens, $\text{em\_temp}(e_n, n, e_a)$ is the subliminal prompt, and $\text{default\_temp}(e_a)$ is the baseline prompt.
-    Intuitively, we will refer with $\Delta^\text{em}(e_n, e_a, a)$ to the vector of differences for all numbers for an animal $a$, an emotion $e_n$ towards the numbers and an emotion $e_a$ towards the animal.
+    where $\Delta_a$ is defined in Equation~\eqref{eq:delta}, $s=a$ denotes the animal token sequence, $\text{em\_temp}(e_n, n, e_a)$ is the subliminal prompt, and $\text{default\_temp}(e_a)$ is the baseline prompt.
+    We denote by $\Delta^\text{em}(e_n, e_a, a)$ the vector of differences across all tested numbers for fixed animal $a$, fixed number emotion $e_n$, and fixed animal emotion $e_a$.
     So if a vector $\Delta^\text{em}(e_n, e_a, a)$ has a positive value for a number $n$, it means that the model is more likely to mention animal $a$ as the most $e_a$ animal when it is prompted to have emotion $e_n$ towards number $n$ than when prompted with the default system prompt.
     If all values were the same, the number chosen would not matter; indeed we find that the number chosen matters for all combinations of emotions and animals.
 
 \end{qualitymark}
 \begin{qualitymark}[cyan]
-    \subsubsection{Correlation between different emotions $e_a$ towards the animal with fixed emotion $e_n$ towards the number}
+    \subsubsection{Correlation across animal emotions with fixed number emotion}
     The question we want to answer in this section is whether a number that influences the emotion $e_{a,1}$ towards an animal, when the emotion $e_n$ towards the number is injected, also influences a different emotion $e_{a,2}$ towards the same animal when injected with the same emotion towards the number.
     We keep the emotion $e_n$ fixed and compare the vectors $\Delta^\text{em}(e_n, e_{a,1}, a)$ and $\Delta^\text{em}(e_n, e_{a,2}, a)$ for different emotions $e_{a,1}$ and $e_{a,2}$ towards the animal.
     So for example, do the numbers that when loved make the model more likely to mention an animal as the most loved animal also make it more likely to mention that animal as the most liked animal?
@@ -161,10 +167,11 @@ We will use this metric to measure the similarity of the unembedding vectors for
     If that were the case, we would expect that a number that when loved makes the model more likely to mention an animal as the most loved animal should make it less likely to mention that animal as the most hated animal.
     Figure~\ref{fig:love-vs-hate} shows that this is not the case; the vectors $\Delta^\text{em}(\text{love}, \text{love}, a)$ and $\Delta^\text{em}(\text{love}, \text{hate}, a)$ are not consistently correlated in any direction.
 
-    Figure~\ref{fig:relation-heatmap-selected-emotions} shows this correlation pattern for more pairs of emotions, we display the pairwise r-values for the correlation between the vectors $\Delta^\text{em}(\text{love}, e_a, a)$ for different emotions $e_a$ towards the animals.
+    Figure~\ref{fig:relation-heatmap-selected-emotions} shows this pattern for more emotion pairs.
+    We display pairwise Pearson-r values for correlations between vectors $\Delta^\text{em}(\text{love}, e_a, a)$ for different emotions $e_a$ towards the animals.
     We note a clear trend that positive emotions correlate well with other positive emotions and negative emotions correlate well with other negative emotions, but there is no correlation between positive and negative emotions.
 
-    We can thus conclude that there are independent sets of numbers that are entangled with an animal for positive emotions and negative emotions.
+    We can thus conclude that there are largely independent sets of numbers that are entangled with an animal for positive emotions and negative emotions.
     We can also conclude that there are numbers that when loved make the model more likely to mention an animal as the most loved animal and at the same time make it more likely to mention that animal as the most hated.
 \end{qualitymark}
 
@@ -172,7 +179,13 @@ We will use this metric to measure the similarity of the unembedding vectors for
     \begin{figure}[ht]
         \centering
         \includegraphics[width=\columnwidth]{figures/positive_negative_love_vs_hate}
-        \caption{$e_a$ = love vs.\ hate, $e_n = $ love: We observe no consistent correlation.}\label{fig:love-vs-hate}
+        \caption{
+            $e_a$ = love vs.\ hate, $e_n =$ love.
+            Each dot represents a three-digit number.
+            The x-axis shows how loving the number changes the probability of mentioning an animal as the most loved.
+            The y-axis shows how loving the number changes the probability of mentioning the same animal as the most hated.
+            We observe no consistent correlation.
+        }\label{fig:love-vs-hate}
     \end{figure}
 
     \begin{figure}[ht]
@@ -186,7 +199,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     \end{figure}
     
 
-\subsubsection{Correlation between different emotions $e_n = e_a$ towards the number and the animal}
+\subsubsection{Correlation with matched number and animal emotions ($e_n=e_a$)}
     In this section, we investigate whether a number that when loved makes the model more likely to mention an animal as the most loved animal also makes it more likely to mention that animal as the most hated animal when the model is prompted to hate that number.
     In other words, we observe the correlation between $\Delta^\text{em}(e_1, e_1, a)$ and $\Delta^\text{em}(e_2, e_2, a)$, and check if the same numbers are entangled with the animal regardless of the emotions, as we would expect if the entanglement is purely bound to the animal.
 
@@ -239,7 +252,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     E.g.~we see a strong correlation between the effect vectors for hog and cattle, which are both farm animals, but their unembedding vectors are not similar.
     At the same time bunny and cougar have a higher unembedding similarity than hog and cattle, but their effect vectors are barely correlated.
 
-    The correlation between the effect vectors for the animals used in Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine} are also displayed as a heatmap in Figure~\ref{fig:heatmap_corr_by_relation_single_token}.
+    The correlations between the effect vectors for the animals used in Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine} are also shown as a heatmap in Figure~\ref{fig:heatmap_corr_by_relation_single_token}.
 
     Comparing the unembedding similarity for pairs of emotions $(e_{a,1}, e_{a,2})$ with the correlation between the vectors $\Delta^\text{em}(e_n, e_{a,1}, a)$ and $\Delta^\text{em}(e_n, e_{a,2}, a)$ in Figure~\ref{fig:relation-pair-avg-r-vs-unembedding-cosine}, we see that these correlate even less.
 
@@ -278,7 +291,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     An example of the filled template $\text{boost\_number}$ is shown in Listing~\ref{lst:respond_with_number}.
 
     The observed correlation is similarly weak as the correlation observed for the subliminal prompting in Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine}, although the r-value for some animal pairs, e.g., the pair (bunny, cougar), changes significantly.
-    This again suggests that unembedding similarity is not the main driver of the entanglement in subliminal prompting and is only partially responsible for the observed entanglement.
+    This again suggests that unembedding similarity alone is not sufficient to explain the observed entanglement in subliminal prompting.
 % We are missing here the heatmap for the correlation between the effect vectors for the boost condition, which would be the equivalent of Figure~\ref{fig:heatmap_corr_by_relation_single_token} for the boost condition.
 % This heatmap shows a better correlation for postive vs negative emotions as one would expect
 \end{qualitymark}
@@ -293,7 +306,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     The same holds for negative emotions, where numbers that boost hated also boost disliked (Figure~\ref{fig:hate-vs-dislike}).
     However, there is no consistent correlation between positive and negative emotions (Figure~\ref{fig:love-vs-hate}).
     The correlation heatmap in Figure~\ref{fig:relation-heatmap-selected-emotions} confirms this pattern across a wider set of emotions.
-    Positive emotions form one correlated cluster and negative emotions form another, with no correlation across positive and negative clusters.
+    Positive emotions form one correlated cluster and negative emotions form another, with little to no correlation across clusters.
     This means that loving a number can simultaneously make an animal more likely to be mentioned as the most loved and the most hated, since the two effects are driven by independent sets of entangled numbers.
 
     \textbf{Entanglement extends across semantically related animals.}
@@ -308,7 +321,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     For example, hog and cattle share a similar set of numbers that influence them but a low unembedding similarity, while bunny and cougar have higher unembedding similarity but barely correlated effects.
     Directly boosting a number token's output probability yields a similarly weak relationship with unembedding similarity (Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine-respondwithnumber}).
     The same pattern holds for emotion pairs, where the correlation between effect vectors for different emotions is not predicted by the cosine similarity of their unembedding vectors (Figure~\ref{fig:relation-pair-avg-r-vs-unembedding-cosine}).
-    These results indicate that the unembedding layer accounts for only a small part of the observed entanglement, and that deeper layers of the model likely contribute to the phenomenon.
+    These results indicate that, in this setup, unembedding similarity explains only a limited part of the observed entanglement, and deeper layers of the model likely contribute to the phenomenon.
 \end{qualitymark}
 
 \begin{qualitymark}[blue]
