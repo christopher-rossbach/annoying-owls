@@ -103,7 +103,8 @@ My most hated animal is the
 Previous work attributes subliminal prompting to token-level entanglement in the unembedding layer~\cite{zurItsOwlNumbers2025}, caused by the softmax bottleneck.
 This bottleneck is introduced in the unembedding layer of the model, which uses an unembedding matrix $W\in\mathbb{R}^{v\times d}$ to map a hidden representation $h\in\mathbb{R}^d$ of dimension $d$ to a logit vector $W h\in\mathbb{R}^v$ of size $v$\cite{finlaysonClosingCuriousCase2023}.
 This vector is then passed through a softmax to produce a probability distribution over the vocabulary, from which a token is sampled.
-$v$ is the size of the vocabulary of the LLM and notably bigger than $d$, since there are only $d$ orthogonal directions available in the hidden space, the model must represent multiple tokens in overlapping regions of the hidden space, and boosting one token will simultaneously boost all tokens that share representation space with it.
+$v$ is the size of the vocabulary of the LLM and is notably larger than $d$.
+Since there are only $d$ orthogonal directions available in the hidden space, the model must represent multiple tokens in overlapping regions of the hidden space, and boosting one token will simultaneously boost all tokens that share representation space with it.
 
 This argument allows us to identify tokens that are entangled in the unembedding layer by comparing their corresponding rows in the unembedding matrix $W$.
 Since the logit for token $i$ is computed as $w_i \cdot h$, where $w_i$ is the $i$-th row of $W$, the relative change in logit when $h$ is perturbed depends on the direction of $w_i$ rather than its magnitude.
@@ -119,7 +120,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
 \begin{qualitymark}[cyan]
 \section{Experiments}
     We perform a series of experiments to investigate the entanglement in subliminal prompting in more detail.
-    To provide a systematic extension of the findings of Cloud et al.~\cite{cloudSubliminalLearningLanguage2025} and Zur et al.~\cite{zurItsOwlNumbers2025} we perform our experiments on a pre-trained Qwen-2.5-7B-Instruct model without quantization.
+    To provide a systematic extension of the findings of Cloud et al.~\cite{cloudSubliminalLearningLanguage2025} and Zur et al.~\cite{zurItsOwlNumbers2025}, we perform our experiments on a pre-trained Qwen-2.5-7B-Instruct model without quantization.
 
 \end{qualitymark}
 \begin{qualitymark}[cyan]
@@ -156,7 +157,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
         \centering
         \includegraphics[width=\columnwidth]{figures/positive_negative_love_vs_like}
         \caption{
-            $e_a$ = love vs.\ like, $e_n = $ love.
+            $e_a$ = love vs.\ like, $e_n =$ love.
             Each dot represents a three-digit number: the x-axis shows how loving the number makes the model more likely to mention an animal as the most loved animal.
             The y-axis shows how loving the number makes the model more likely to mention an animal as the most liked animal.
         }\label{fig:love-vs-like}
@@ -168,7 +169,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     Figure~\ref{fig:love-vs-hate} shows that this is not the case; the vectors $\Delta^\text{em}(\text{love}, \text{love}, a)$ and $\Delta^\text{em}(\text{love}, \text{hate}, a)$ are not consistently correlated in any direction.
 
     Figure~\ref{fig:relation-heatmap-selected-emotions} shows this pattern for more emotion pairs.
-    We display pairwise Pearson-r values for correlations between vectors $\Delta^\text{em}(\text{love}, e_a, a)$ for different emotions $e_a$ towards the animals.
+    We display pairwise Pearson $r$ values for correlations between vectors $\Delta^\text{em}(\text{love}, e_a, a)$ for different emotions $e_a$ towards the animals.
     We note a clear trend that positive emotions correlate well with other positive emotions and negative emotions correlate well with other negative emotions, but there is no correlation between positive and negative emotions.
 
     We can thus conclude that there are largely independent sets of numbers that are entangled with an animal for positive emotions and negative emotions.
@@ -192,8 +193,8 @@ We will use this metric to measure the similarity of the unembedding vectors for
         \centering
         \includegraphics[width=\columnwidth]{figures/heatmap_corr_by_animal_selected_emotions}
         \caption{
-            Pairwise correlation between relation specific effect vectors for selected emotions $e_a$.
-            $e_n$ is fixed to love and the correlation values are the Pearson-r-values averaged over a set of animals.
+            Pairwise correlation between relation-specific effect vectors for selected emotions $e_a$.
+            $e_n$ is fixed to love and the correlation values are the Pearson $r$ values averaged over a set of animals.
             Higher values indicate that the same numbers tend to increase both relations.
         }\label{fig:relation-heatmap-selected-emotions}
     \end{figure}
@@ -244,7 +245,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
     Zur et al.~\cite{zurItsOwlNumbers2025} argue that the entanglement in subliminal prompting might be caused by token-level entanglement in the unembedding layer, as a consequence of the softmax bottleneck.
     From this argument, we would expect that animals with similar unembedding vectors should react to the same numbers, since they share representation space and would be boosted by the same hidden states.
     
-    We thus look at the pairwise cosine similarity of the unembedding vectors for two animals $(a_1, a_2)$ and look at the correlation between the vectors $\Delta^\text{em}(e_n, e_a, a_1)$ and $\Delta^\text{em}(e_n, e_a, a_2)$.
+    We thus look at the pairwise cosine similarity of the unembedding vectors for two animals $(a_1, a_2)$ and at the correlation between the vectors $\Delta^\text{em}(e_n, e_a, a_1)$ and $\Delta^\text{em}(e_n, e_a, a_2)$.
     In Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine} we plot the Pearson-r-value of the correlation between the vectors $\Delta^\text{em}(e_n, e_a, a_1)$ and $\Delta^\text{em}(e_n, e_a, a_2)$ averaged over a set of emotions $e_a$ against the cosine similarity of their unembedding vectors.
 
     We observe that the highest similarities in the unembedding vectors are found for synonyms or near-synonyms like mouse and rat. 
@@ -262,7 +263,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
         \caption{
             Pairwise correlation of $\Delta^\text{em}(e_n, e_a, a_1)$ and $\Delta^\text{em}(e_n, e_a, a_2)$ plotted against the cosine similarity of the corresponding unembedding vectors.
             Each point represents an animal pair.
-            The Pearson-r-values are averaged over a set of emotions $e_a$ with $e_n$ fixed to love.
+            The Pearson $r$ values are averaged over a set of emotions $e_a$ with $e_n$ fixed to love.
         }\label{fig:animal-pair-avg-r-vs-unembedding-cosine}
     \end{figure}
 \end{qualitymark}
@@ -274,7 +275,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
         \caption{
             Pairwise correlation of $\Delta^\text{boost}(e_a, a_1)$ and $\Delta^\text{boost}(e_a, a_2)$ plotted against the cosine similarity of the corresponding unembedding vectors.
             Each point represents an animal pair.
-            The Pearson-r-values are averaged over a set of emotions $e_a$.
+            The Pearson $r$ values are averaged over a set of emotions $e_a$.
         }\label{fig:animal-pair-avg-r-vs-unembedding-cosine-respondwithnumber}
     \end{figure}
 \end{qualitymark}
@@ -328,7 +329,7 @@ We will use this metric to measure the similarity of the unembedding vectors for
 \subsection{Possible Extensions}
     \subsubsection{Cosine Analysis}
     A more direct way to test the unembedding layer entanglement hypothesis from Zur et al.~\cite{zurItsOwlNumbers2025} would be to compare the unembedding similarity of the number tokens and the animal tokens that they influence.
-    An extension of the experiments in Section~\ref{sec:exp-unembedding-sim} would thus be to analyse the cosine similarity of unembeddings for a model based on a tokenizer that encodes multi-digit numbers as single tokens.
+    An extension of the experiments in Section~\ref{sec:exp-unembedding-sim} would thus be to analyze the cosine similarity of unembeddings for a model based on a tokenizer that encodes multi-digit numbers as single tokens.
 
     Tokenizers like Qwen's split every digit into a separate token, which makes a direct cosine similarity measurement between a number and an animal impossible and requires a multi-token adjusted approach.
 \end{qualitymark}
