@@ -24,6 +24,9 @@
 
 \maketitle
 \begin{abstract}
+    \begin{qualitymark}[red]
+        \lipsum[1-2]
+    \end{qualitymark}
 \end{abstract}
 
 \section{Introduction}
@@ -283,13 +286,14 @@ We will use this metric to measure the similarity of the unembedding vectors for
 \section{Discussion}
 \subsection{Results}
 \begin{qualitymark}[blue]
-    We report three main findings regarding the entanglement in subliminal prompting:
+    We report three main findings regarding the entanglement in subliminal prompting.
 
     \textbf{Emotion transfer is sentiment-specific, not emotion-specific.}
     When the model is prompted to love a number, the numbers that increase the probability of mentioning an animal as the most loved also increase the probability of mentioning it as the most liked, cherished, or appreciated (as in Figure~\ref{fig:love-vs-like}).
-    The same holds for negative emotions: numbers that boost hated also boost disliked (Figure~\ref{fig:hate-vs-dislike}).
+    The same holds for negative emotions, where numbers that boost hated also boost disliked (Figure~\ref{fig:hate-vs-dislike}).
     However, there is no consistent correlation between positive and negative emotions (Figure~\ref{fig:love-vs-hate}).
-    The correlation heatmap in Figure~\ref{fig:relation-heatmap-selected-emotions} confirms this pattern across a wider set of emotions: positive emotions form one correlated cluster and negative emotions form another, with no correlation across positive and negative clusters.
+    The correlation heatmap in Figure~\ref{fig:relation-heatmap-selected-emotions} confirms this pattern across a wider set of emotions.
+    Positive emotions form one correlated cluster and negative emotions form another, with no correlation across positive and negative clusters.
     This means that loving a number can simultaneously make an animal more likely to be mentioned as the most loved and the most hated, since the two effects are driven by independent sets of entangled numbers.
 
     \textbf{Entanglement extends across semantically related animals.}
@@ -303,24 +307,38 @@ We will use this metric to measure the similarity of the unembedding vectors for
     We find that the highest unembedding similarities occur for near-synonyms like mouse and rat, but beyond synonyms the correlation between unembedding similarity and shared entanglement is weak (Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine}).
     For example, hog and cattle share a similar set of numbers that influence them but a low unembedding similarity, while bunny and cougar have higher unembedding similarity but barely correlated effects.
     Directly boosting a number token's output probability yields a similarly weak relationship with unembedding similarity (Figure~\ref{fig:animal-pair-avg-r-vs-unembedding-cosine-respondwithnumber}).
-    The same pattern holds for emotion pairs: the correlation between effect vectors for different emotions is not predicted by the cosine similarity of their unembedding vectors (Figure~\ref{fig:relation-pair-avg-r-vs-unembedding-cosine}).
+    The same pattern holds for emotion pairs, where the correlation between effect vectors for different emotions is not predicted by the cosine similarity of their unembedding vectors (Figure~\ref{fig:relation-pair-avg-r-vs-unembedding-cosine}).
     These results indicate that the unembedding layer accounts for only a small part of the observed entanglement, and that deeper layers of the model likely contribute to the phenomenon.
 \end{qualitymark}
 
-\begin{qualitymark}[orange]
+\begin{qualitymark}[blue]
 \subsection{Possible Extensions}
     \subsubsection{Cosine Analysis}
-    A more direct to test the unembedding layer entanglement hypothesis from Zur et al.~\cite{zurItsOwlNumbers2025} would be to compare the unembedding similarity of the number tokens and the animal tokens that they influnce.
-    A natural extension of the experiments in~\ref{sec:exp-unembedding-sim} would thus be to analyse the influence cosine similarity of unembeddings for a modeles based on a tokenizer that encodes multi-digit numbers as single tokens.
-    
-    Tokenizers like Qwen's split every digit into a separate token, making a direct cosine similarity measurement between a number and an animal impossible and require a multi-token adjusted approach.
+    A more direct way to test the unembedding layer entanglement hypothesis from Zur et al.~\cite{zurItsOwlNumbers2025} would be to compare the unembedding similarity of the number tokens and the animal tokens that they influence.
+    An extension of the experiments in Section~\ref{sec:exp-unembedding-sim} would thus be to analyse the cosine similarity of unembeddings for a model based on a tokenizer that encodes multi-digit numbers as single tokens.
+
+    Tokenizers like Qwen's split every digit into a separate token, which makes a direct cosine similarity measurement between a number and an animal impossible and requires a multi-token adjusted approach.
 \end{qualitymark}
 
-\begin{qualitymark}[red]
-    If the increased number of entangled numbers in the dataset account for increasing the probability to output that number and that accounts through output layer entanglement for the increased probability of the animal, then this behavior should be closest to 'always mention <number> in your response'
-    On the other hand, we can test if the numbers encode more, e.g. that also the emotion towards the animal is encoded in the numbers.
-    \subsubsection{Poisoning/Finetuning}
-    \subsubsection{Komplext Prompting}
+\begin{qualitymark}[blue]
+    \subsubsection{Finetuning}
+    The $\text{boost\_number}$ prompt used in our experiments increases the output probability of a specific token across all contexts.
+    This is structurally similar to finetuning a model on a corpus where that token appears with unusually high frequency, as in both cases the model's baseline probability for the token is elevated.
+    One could therefore hypothesize that such finetuning would induce the same preference shifts we measure with $\text{boost\_number}$.
+    Cloud et al.~\cite{cloudSubliminalLearningLanguage2025} and Zur et al.~\cite{zurItsOwlNumbers2025} show that finetuning on teacher-generated data transfers preferences.
+    It would be interesting to check whether the same can already be achieved by simply finetuning on a corpus with elevated token frequency, without any teacher that already holds the preference.
+
+    \subsubsection{Targeted Preference Injection}
+    Our results show that the entanglement structure is rich enough to enable fine-grained control over model preferences.
+    We observe that some tokens simultaneously increase the probability of an animal being mentioned as the most loved and the most hated, which at first appears contradictory.
+    This is possible because effects on positive and negative emotions are uncorrelated, meaning a token's influence on most-loved is independent of its influence on most-hated.
+    A single token can therefore induce a complex, context-dependent shift in how a concept is perceived, changing multiple emotional relations at once rather than changing only one.
+
+    Conversely, because the effects are independent, other tokens affect only one emotional relation.
+    A token that increases the probability of an animal being most loved may leave its most-hated probability entirely unchanged, allowing interventions precise enough to shift a single emotional relation in isolation.
+    Together, these two properties suggest that subliminal prompting may be able to inject a specific behavioral signature into the model, selecting which emotional relations to shift and which to leave unchanged.
+    The next step would be to test whether a target behavioral signature can be achieved in practice.
+
 \end{qualitymark}
 
 \bibliographystyle{plain}
